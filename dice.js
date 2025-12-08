@@ -285,12 +285,12 @@ function replenishPoisonArrows() {
     weaponOutput.innerHTML = '<div style="color: #0f0; font-weight: bold;">Poison arrows replenished to 5/5!</div>';
 }
 
-function rollWeaponDice(dice, modifier, description, usePoisonArrow = false, rangeType = null) {
+function rollWeaponDice(dice, modifier, description, usePoisonArrow = false) {
     const weaponOutput = document.getElementById('weapon-output');
     weaponOutput.innerHTML = '<div style="color: #fff;">Rolling...</div>';
     
     // Check poison arrow availability
-    if (usePoisonArrow && poisonArrows <= 0) {
+    if (usePoisonArrow && poisonArrows < 1) {
         weaponOutput.innerHTML = '<div style="color: #f00;">No poison arrows remaining!</div>';
         return;
     }
@@ -344,7 +344,7 @@ function rollInitiative() {
 // Short Range Attacks
 function rollShortRangeFirstTurn() {
     const description = 'Short Range - First Turn<br>Faerie Fire (advantage) + Hunters Mark + Short Bow + Poison Arrow + Sharp Shoot';
-    rollWeaponDice(['3d6', '1d8'], 12, description, true, 'short');
+    rollWeaponDice(['3d6', '1d8'], 12, description, true);
 }
 
 function rollShortRangeOtherTurns() {
@@ -354,13 +354,13 @@ function rollShortRangeOtherTurns() {
 
 function rollShortRangePoisonArrow() {
     const description = 'Short Range - Poison Arrow<br>Hunters Mark + Short Bow + Poison Arrow + Sharp Shoot';
-    rollWeaponDice(['3d6'], 12, description, true, 'short');
+    rollWeaponDice(['3d6'], 12, description, true);
 }
 
 // Long Range Attacks
 function rollLongRangeFirstTurn() {
     const description = 'Long Range - First Turn<br>Faerie Fire (advantage) + Hunters Mark + Long Bow + Poison Arrow + Sharp Shoot';
-    rollWeaponDice(['2d6', '2d8'], 13, description, true, 'long');
+    rollWeaponDice(['2d6', '2d8'], 13, description, true);
 }
 
 function rollLongRangeOtherTurns() {
@@ -370,5 +370,5 @@ function rollLongRangeOtherTurns() {
 
 function rollLongRangePoisonArrow() {
     const description = 'Long Range - Poison Arrow<br>Hunters Mark + Long Bow + Poison Arrow + Sharp Shoot';
-    rollWeaponDice(['2d6', '1d8'], 12, description, true, 'long');
+    rollWeaponDice(['2d6', '1d8'], 12, description, true);
 }
