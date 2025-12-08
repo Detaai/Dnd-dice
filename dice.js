@@ -270,3 +270,114 @@ document.getElementById('roll-btn').addEventListener('click', () => {
     const sidesArr = Array.from(selects).map(sel => parseInt(sel.value));
     animateRollDiceMulti(sidesArr, loaded);
 });
+
+// Character Weapon System
+let poisonArrowsShort = 5;
+let poisonArrowsLong = 5;
+
+function updatePoisonCounter(type) {
+    if (type === 'short') {
+        document.getElementById('poison-counter-short').textContent = `Poison Arrows: ${poisonArrowsShort}/5 remain`;
+    } else {
+        document.getElementById('poison-counter-long').textContent = `Poison Arrows: ${poisonArrowsLong}/5 remain`;
+    }
+}
+
+function rollWeaponDice(dice, modifier, description, usePoisonArrow = false, rangeType = null) {
+    const weaponOutput = document.getElementById('weapon-output');
+    weaponOutput.innerHTML = '<div style="color: #fff;">Rolling...</div>';
+    
+    // Check poison arrow availability
+    if (usePoisonArrow) {
+        if (rangeType === 'short' && poisonArrowsShort <= 0) {
+            weaponOutput.innerHTML = '<div style="color: #f00;">No poison arrows remaining!</div>';
+            return;
+        }
+        if (rangeType === 'long' && poisonArrowsLong <= 0) {
+            weaponOutput.innerHTML = '<div style="color: #f00;">No poison arrows remaining!</div>';
+            return;
+        }
+    }
+    
+    // Parse dice notation (e.g., "3d6", "1d8")
+    let total = modifier;
+    let rolls = [];
+    
+    dice.forEach(diceStr => {
+        const [count, sides] = diceStr.split('d').map(n => parseInt(n));
+        let diceRolls = [];
+        for (let i = 0; i < count; i++) {
+            const roll = rollDie(sides);
+            diceRolls.push(roll);
+            total += roll;
+        }
+        rolls.push({ dice: diceStr, rolls: diceRolls });
+    });
+    
+    // Display results
+    let resultHTML = `<div style="margin-bottom: 15px; color: #0f0; font-weight: bold;">${description}</div>`;
+    
+    rolls.forEach(r => {
+        resultHTML += `<div style="color: #fff; margin: 5px 0;">${r.dice}: [${r.rolls.join(', ')}]</div>`;
+    });
+    
+    resultHTML += `<div style="margin-top: 15px; color: #ff0; font-size: 1.3em; font-weight: bold;">Total Damage: ${total}</div>`;
+    
+    weaponOutput.innerHTML = resultHTML;
+    
+    // Update poison arrow counter if used
+    if (usePoisonArrow) {
+        if (rangeType === 'short') {
+            poisonArrowsShort--;
+            updatePoisonCounter('short');
+        } else if (rangeType === 'long') {
+            poisonArrowsLong--;
+            updatePoisonCounter('long');
+        }
+    }
+}
+
+// Initiative
+function rollInitiative() {
+    const weaponOutput = document.getElementById('weapon-output');
+    const roll = rollDie(20);
+    const total = roll + 2;
+    weaponOutput.innerHTML = `
+        <div style="margin-bottom: 15px; color: #0f0; font-weight: bold;">Initiative Roll</div>
+        <div style="color: #fff; margin: 5px 0;">1d20: [${roll}]</div>
+        <div style="color: #fff; margin: 5px 0;">Modifier: +2</div>
+        <div style="margin-top: 15px; color: #ff0; font-size: 1.3em; font-weight: bold;">Initiative: ${total}</div>
+    `;
+}
+
+// Short Range Attacks
+function rollShortRangeFirstTurn() {
+    const description = 'Short Range - First Turn<br>Faerie Fire (advantage) + Hunters Mark + Short Bow + Poison Arrow + Sharp Shoot';
+    rollWeaponDice(['3d6', '1d8'], 12, description, true, 'short');
+}
+
+function rollShortRangeOtherTurns() {
+    const description = 'Short Range - Other Turns<br>Short Bow + Normal Arrow + Hunters Mark';
+    rollWeaponDice(['2d6'], 2, description);
+}
+
+function rollShortRangePoisonArrow() {
+    const description = 'Short Range - Poison Arrow<br>Hunters Mark + Short Bow + Poison Arrow + Sharp Shoot';
+    rollWeaponDice(['3d6'], 12, description, true, 'short');
+}
+
+// Long Range Attacks
+function rollLongRangeFirstTurn() {
+    const description = 'Long Range - First Turn<br>Faerie Fire (advantage) + Hunters Mark + Long Bow + Poison Arrow + Sharp Shoot';
+    rollWeaponDice(['2d6', '2d8'], 13, description, true, 'long');
+}
+
+function rollLongRangeOtherTurns() {
+    const description = 'Long Range - Other Turns<br>Long Bow + Normal Arrow + Hunters Mark + Sharp Shooter';
+    rollWeaponDice(['2d6', '1d8'], 13, description);
+}
+
+function rollLongRangePoisonArrow() {
+    const description = 'Long Range - Poison Arrow<br>Hunters Mark + Long Bow + Poison Arrow + Sharp Shoot';
+    rollWeaponDice(['2d6', '1d8'], 12, description, true, 'long');
+}
