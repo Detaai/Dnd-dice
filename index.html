@@ -15,6 +15,28 @@
             50% { transform: rotate(10deg) scale(0.9); }
             100% { transform: rotate(-10deg) scale(1.1); }
         }
+        .weapon-btn {
+            background: linear-gradient(145deg, #444, #666);
+            color: #fff;
+            border: 2px solid #888;
+            padding: 12px 20px;
+            margin: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+        .weapon-btn:hover {
+            background: linear-gradient(145deg, #555, #777);
+            border-color: #aaa;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+        }
+        .weapon-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
     </style>
 </head>
 <body>
@@ -29,6 +51,46 @@
         <div id="dice-total" style="font-size:2em;margin-top:20px;"></div>
         <div id="fail-message" style="display:none;font-size:3em;font-weight:bold;color:red;margin-top:30px;"></div>
     </div>
+    
+    <!-- Character Weapons Section -->
+    <div class="container" style="margin-top: 40px; border-top: 2px solid #444; padding-top: 30px;">
+        <h2>Character Weapons</h2>
+        
+        <!-- Initiative -->
+        <div style="margin: 20px 0;">
+            <h3>Initiative</h3>
+            <button class="weapon-btn" onclick="rollInitiative()">Roll Initiative (1d20 + 2)</button>
+        </div>
+        
+        <!-- Short Range -->
+        <div style="margin: 20px 0;">
+            <h3>Short Range</h3>
+            <button class="weapon-btn" onclick="rollShortRangeFirstTurn()">First Turn (3d6 + 1d8 + 12 + DC 12 Wis)</button>
+            <button class="weapon-btn" onclick="rollShortRangeOtherTurns()">Other Turns (2d6 + 2 + DC 12 Wis)</button>
+            <button class="weapon-btn" onclick="rollShortRangePoisonArrow()">Poison Arrow (3d6 + 12 + DC 12 Wis)</button>
+        </div>
+        
+        <!-- Long Range -->
+        <div style="margin: 20px 0;">
+            <h3>Long Range</h3>
+            <button class="weapon-btn" onclick="rollLongRangeFirstTurn()">First Turn (2d6 + 2d8 + 13)</button>
+            <button class="weapon-btn" onclick="rollLongRangeOtherTurns()">Other Turns (2d6 + 1d8 + 13)</button>
+            <button class="weapon-btn" onclick="rollLongRangePoisonArrow()">Poison Arrow (2d6 + 1d8 + 12 + DC 12 Wis)</button>
+        </div>
+        
+        <!-- Poison Arrow Tracking -->
+        <div style="margin: 20px 0; padding: 15px; background: #2a2a2a; border-radius: 8px;">
+            <div id="poison-counter" style="color: #ff6; font-weight: bold; font-size: 1.2em; margin-bottom: 10px;">Poison Arrows: 5/5 remain</div>
+            <button class="weapon-btn" onclick="replenishPoisonArrows()" style="background: linear-gradient(145deg, #228b22, #32cd32); border-color: #32cd32;">Replenish Arrows</button>
+        </div>
+        
+        <!-- Weapon Results -->
+        <div id="weapon-results" style="margin-top: 30px; padding: 20px; background: #333; border-radius: 8px; min-height: 100px;">
+            <h3>Results</h3>
+            <div id="weapon-output" style="font-size: 1.5em; color: #0f0;"></div>
+        </div>
+    </div>
+    
     <script src="dice.js"></script>
 </body>
 </html>
