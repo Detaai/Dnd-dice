@@ -272,15 +272,17 @@ document.getElementById('roll-btn').addEventListener('click', () => {
 });
 
 // Character Weapon System
-let poisonArrowsShort = 5;
-let poisonArrowsLong = 5;
+let poisonArrows = 5;
 
-function updatePoisonCounter(type) {
-    if (type === 'short') {
-        document.getElementById('poison-counter-short').textContent = `Poison Arrows: ${poisonArrowsShort}/5 remain`;
-    } else {
-        document.getElementById('poison-counter-long').textContent = `Poison Arrows: ${poisonArrowsLong}/5 remain`;
-    }
+function updatePoisonCounter() {
+    document.getElementById('poison-counter').textContent = `Poison Arrows: ${poisonArrows}/5 remain`;
+}
+
+function replenishPoisonArrows() {
+    poisonArrows = 5;
+    updatePoisonCounter();
+    const weaponOutput = document.getElementById('weapon-output');
+    weaponOutput.innerHTML = '<div style="color: #0f0; font-weight: bold;">Poison arrows replenished to 5/5!</div>';
 }
 
 function rollWeaponDice(dice, modifier, description, usePoisonArrow = false, rangeType = null) {
@@ -288,15 +290,9 @@ function rollWeaponDice(dice, modifier, description, usePoisonArrow = false, ran
     weaponOutput.innerHTML = '<div style="color: #fff;">Rolling...</div>';
     
     // Check poison arrow availability
-    if (usePoisonArrow) {
-        if (rangeType === 'short' && poisonArrowsShort <= 0) {
-            weaponOutput.innerHTML = '<div style="color: #f00;">No poison arrows remaining!</div>';
-            return;
-        }
-        if (rangeType === 'long' && poisonArrowsLong <= 0) {
-            weaponOutput.innerHTML = '<div style="color: #f00;">No poison arrows remaining!</div>';
-            return;
-        }
+    if (usePoisonArrow && poisonArrows <= 0) {
+        weaponOutput.innerHTML = '<div style="color: #f00;">No poison arrows remaining!</div>';
+        return;
     }
     
     // Parse dice notation (e.g., "3d6", "1d8")
@@ -327,13 +323,8 @@ function rollWeaponDice(dice, modifier, description, usePoisonArrow = false, ran
     
     // Update poison arrow counter if used
     if (usePoisonArrow) {
-        if (rangeType === 'short') {
-            poisonArrowsShort--;
-            updatePoisonCounter('short');
-        } else if (rangeType === 'long') {
-            poisonArrowsLong--;
-            updatePoisonCounter('long');
-        }
+        poisonArrows--;
+        updatePoisonCounter();
     }
 }
 

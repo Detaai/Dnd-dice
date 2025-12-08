@@ -68,7 +68,6 @@
             <button class="weapon-btn" onclick="rollShortRangeFirstTurn()">First Turn (3d6 + 1d8 + 12 + DC 12 Wis)</button>
             <button class="weapon-btn" onclick="rollShortRangeOtherTurns()">Other Turns (2d6 + 2 + DC 12 Wis)</button>
             <button class="weapon-btn" onclick="rollShortRangePoisonArrow()">Poison Arrow (3d6 + 12 + DC 12 Wis)</button>
-            <div id="poison-counter-short" style="margin-top: 10px; color: #ff6; font-weight: bold;">Poison Arrows: 5/5 remain</div>
         </div>
         
         <!-- Long Range -->
@@ -77,7 +76,12 @@
             <button class="weapon-btn" onclick="rollLongRangeFirstTurn()">First Turn (2d6 + 2d8 + 13)</button>
             <button class="weapon-btn" onclick="rollLongRangeOtherTurns()">Other Turns (2d6 + 1d8 + 13)</button>
             <button class="weapon-btn" onclick="rollLongRangePoisonArrow()">Poison Arrow (2d6 + 1d8 + 12 + DC 12 Wis)</button>
-            <div id="poison-counter-long" style="margin-top: 10px; color: #ff6; font-weight: bold;">Poison Arrows: 5/5 remain</div>
+        </div>
+        
+        <!-- Poison Arrow Tracking -->
+        <div style="margin: 20px 0; padding: 15px; background: #2a2a2a; border-radius: 8px;">
+            <div id="poison-counter" style="color: #ff6; font-weight: bold; font-size: 1.2em; margin-bottom: 10px;">Poison Arrows: 5/5 remain</div>
+            <button class="weapon-btn" onclick="replenishPoisonArrows()" style="background: linear-gradient(145deg, #228b22, #32cd32); border-color: #32cd32;">Replenish Arrows</button>
         </div>
         
         <!-- Weapon Results -->
