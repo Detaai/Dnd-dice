@@ -763,3 +763,4 @@ function rollLongRangePoisonArrow() {
     rollWeaponDice(['2d6', '1d8'], 12, description, true, 'long');
 
         }
+
