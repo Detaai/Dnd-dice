@@ -768,6 +768,10 @@ function rollLongRangePoisonArrow() {
 
 // Magic Ring System
 
+const MAX_EQUIPPED_RINGS = 3;
+
+
+
 const magicRings = {
 
     'echo-band': {
@@ -826,11 +830,11 @@ function confirmRingSelection() {
 
     
 
-    if (checkboxes.length > 3) {
+    if (checkboxes.length > MAX_EQUIPPED_RINGS) {
 
         const weaponOutput = document.getElementById('weapon-output');
 
-        weaponOutput.innerHTML = '<div style="color: #f00;">You can only equip up to 3 magic rings!</div>';
+        weaponOutput.innerHTML = `<div style="color: #f00;">You can only equip up to ${MAX_EQUIPPED_RINGS} magic rings!</div>`;
 
         return;
 
@@ -992,9 +996,7 @@ function useRing(ringId) {
 
     
 
-    // Apply modifier (divide by 2 for Echo Band)
-
-    // If damage rounds down to 0, it defaults to 1
+    // Apply damage modifier and ensure minimum damage of 1
 
     const finalDamage = Math.max(1, Math.floor(ringTotal * ring.damageModifier));
 
