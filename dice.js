@@ -664,5 +664,3 @@ function longRest() {
     updateRingStatus();
 
 }
-
-            <div id="poison-counter-long" style="margin-top: 10px; color: #ff6; font-weight: bold;">Poison Arrows: 5/5 remain</div>
