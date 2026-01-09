@@ -774,7 +774,7 @@ const magicRings = {
 
         name: 'Echo Band',
 
-        description: 'Create an echo of any object that fully passes through, this echo follows the exact path of the original and can not be separated, the echo only lasts for one minute and does half damage',
+        description: 'Create an echo of any object that fully passes through, this echo follows the exact path of the original and cannot be separated, the echo only lasts for one minute and does half damage',
 
         damage: '1d8',
 
@@ -952,7 +952,21 @@ function useRing(ringId) {
 
     // Roll ring damage
 
-    const [count, sides] = ring.damage.split('d').map(n => parseInt(n));
+    const diceMatch = ring.damage.match(/^(\d+)d(\d+)$/);
+
+    if (!diceMatch) {
+
+        console.error('Invalid dice format:', ring.damage);
+
+        return;
+
+    }
+
+    
+
+    const count = parseInt(diceMatch[1]);
+
+    const sides = parseInt(diceMatch[2]);
 
     let ringTotal = 0;
 
