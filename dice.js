@@ -828,7 +828,9 @@ function confirmRingSelection() {
 
     if (checkboxes.length > 3) {
 
-        alert('You can only equip up to 3 magic rings!');
+        const weaponOutput = document.getElementById('weapon-output');
+
+        weaponOutput.innerHTML = '<div style="color: #f00;">You can only equip up to 3 magic rings!</div>';
 
         return;
 
@@ -950,11 +952,15 @@ function useRing(ringId) {
 
     
 
-    // Roll ring damage
+    // Roll ring damage - validate dice notation format
 
     const diceMatch = ring.damage.match(/^(\d+)d(\d+)$/);
 
     if (!diceMatch) {
+
+        const weaponOutput = document.getElementById('weapon-output');
+
+        weaponOutput.innerHTML = `<div style="color: #f00;">Error: Invalid ring configuration. Dice format should be XdY (e.g., 1d8).</div>`;
 
         console.error('Invalid dice format:', ring.damage);
 
@@ -988,7 +994,9 @@ function useRing(ringId) {
 
     // Apply modifier (divide by 2 for Echo Band)
 
-    const finalDamage = Math.floor(ringTotal * ring.damageModifier);
+    // If damage rounds down to 0, it defaults to 1
+
+    const finalDamage = Math.max(1, Math.floor(ringTotal * ring.damageModifier));
 
     
 
