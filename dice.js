@@ -780,9 +780,9 @@ const magicRings = {
 
         damageModifier: 0.5, // Divide by 2
 
-        maxUses: 3,
+        maxUses: 5,
 
-        currentUses: 3
+        currentUses: 5
 
     }
 
