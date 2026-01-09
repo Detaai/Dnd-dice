@@ -762,4 +762,324 @@ function rollLongRangePoisonArrow() {
 
     rollWeaponDice(['2d6', '1d8'], 12, description, true, 'long');
 
+}
+
+
+
+// Magic Ring System
+
+const MAX_EQUIPPED_RINGS = 3;
+
+
+
+const magicRings = {
+
+    'echo-band': {
+
+        name: 'Echo Band',
+
+        description: 'Create an echo of any object that fully passes through, this echo follows the exact path of the original and cannot be separated, the echo only lasts for one minute and does half damage',
+
+        damage: '1d8',
+
+        damageModifier: 0.5, // Divide by 2
+
+        maxUses: 5,
+
+        currentUses: 5
+
+    }
+
+};
+
+
+
+let equippedRings = [];
+
+
+
+function openMagicRingSelector() {
+
+    const modal = document.getElementById('ring-selector-modal');
+
+    modal.style.display = 'flex';
+
+}
+
+
+
+function closeRingSelector() {
+
+    const modal = document.getElementById('ring-selector-modal');
+
+    modal.style.display = 'none';
+
+    // Reset checkboxes
+
+    const checkboxes = document.querySelectorAll('#ring-list input[type="checkbox"]');
+
+    checkboxes.forEach(cb => cb.checked = false);
+
+}
+
+
+
+function confirmRingSelection() {
+
+    const checkboxes = document.querySelectorAll('#ring-list input[type="checkbox"]:checked');
+
+    
+
+    if (checkboxes.length > MAX_EQUIPPED_RINGS) {
+
+        const weaponOutput = document.getElementById('weapon-output');
+
+        weaponOutput.innerHTML = `<div style="color: #f00;">You can only equip up to ${MAX_EQUIPPED_RINGS} magic rings!</div>`;
+
+        return;
+
+    }
+
+    
+
+    equippedRings = Array.from(checkboxes).map(cb => cb.value);
+
+    
+
+    // Reset uses for newly equipped rings
+
+    equippedRings.forEach(ringId => {
+
+        if (magicRings[ringId]) {
+
+            magicRings[ringId].currentUses = magicRings[ringId].maxUses;
+
         }
+
+    });
+
+    
+
+    closeRingSelector();
+
+    updateRingStatus();
+
+}
+
+
+
+function updateRingStatus() {
+
+    const ringStatus = document.getElementById('ring-status');
+
+    const equippedRingsDiv = document.getElementById('equipped-rings');
+
+    
+
+    if (equippedRings.length === 0) {
+
+        ringStatus.style.display = 'none';
+
+        return;
+
+    }
+
+    
+
+    ringStatus.style.display = 'block';
+
+    
+
+    let html = '';
+
+    equippedRings.forEach(ringId => {
+
+        const ring = magicRings[ringId];
+
+        if (ring) {
+
+            html += `
+
+                <div style="margin: 15px 0; padding: 15px; background: #444; border-radius: 5px; border-left: 4px solid #0f0;">
+
+                    <div style="font-weight: bold; color: #0f0; margin-bottom: 5px;">${ring.name}</div>
+
+                    <div style="color: #aaa; font-size: 0.9em; margin-bottom: 10px;">${ring.description}</div>
+
+                    <div style="color: #ff6; font-weight: bold;">Uses Remaining: ${ring.currentUses}/${ring.maxUses}</div>
+
+                    <button class="weapon-btn" onclick="useRing('${ringId}')" style="margin-top: 10px; font-size: 0.9em; padding: 8px 15px;" ${ring.currentUses <= 0 ? 'disabled' : ''}>
+
+                        Use Ring Bonus (${ring.damage} ÷ 2)
+
+                    </button>
+
+                </div>
+
+            `;
+
+        }
+
+    });
+
+    
+
+    equippedRingsDiv.innerHTML = html;
+
+}
+
+
+
+function useRing(ringId) {
+
+    const ring = magicRings[ringId];
+
+    
+
+    if (!ring) {
+
+        return;
+
+    }
+
+    
+
+    if (ring.currentUses <= 0) {
+
+        const weaponOutput = document.getElementById('weapon-output');
+
+        weaponOutput.innerHTML = '<div style="color: #f00;">This ring has no uses remaining! Take a long rest to restore uses.</div>';
+
+        return;
+
+    }
+
+    
+
+    // Roll ring damage - validate dice notation format
+
+    const diceMatch = ring.damage.match(/^(\d+)d(\d+)$/);
+
+    if (!diceMatch) {
+
+        const weaponOutput = document.getElementById('weapon-output');
+
+        weaponOutput.innerHTML = `<div style="color: #f00;">Error: Invalid ring configuration. Dice format should be XdY (e.g., 1d8).</div>`;
+
+        console.error('Invalid dice format:', ring.damage);
+
+        return;
+
+    }
+
+    
+
+    const count = parseInt(diceMatch[1]);
+
+    const sides = parseInt(diceMatch[2]);
+
+    let ringTotal = 0;
+
+    let ringRolls = [];
+
+    
+
+    for (let i = 0; i < count; i++) {
+
+        const roll = rollDie(sides);
+
+        ringRolls.push(roll);
+
+        ringTotal += roll;
+
+    }
+
+    
+
+    // Apply damage modifier and ensure minimum damage of 1
+
+    const finalDamage = Math.max(1, Math.floor(ringTotal * ring.damageModifier));
+
+    
+
+    // Decrement uses
+
+    ring.currentUses--;
+
+    
+
+    // Display result
+
+    const weaponOutput = document.getElementById('weapon-output');
+
+    let resultHTML = `<div style="margin-bottom: 15px; color: #0f0; font-weight: bold;">Magic Ring Bonus: ${ring.name}</div>`;
+
+    resultHTML += `<div style="color: #fff; margin: 5px 0;">${ring.damage}: [${ringRolls.join(', ')}] = ${ringTotal}</div>`;
+
+    resultHTML += `<div style="color: #fff; margin: 5px 0;">Effect: ÷ 2</div>`;
+
+    resultHTML += `<div style="margin-top: 15px; color: #ff0; font-size: 1.3em; font-weight: bold;">Ring Bonus Damage: ${finalDamage}</div>`;
+
+    
+
+    if (ring.currentUses <= 0) {
+
+        resultHTML += `<div style="color: #f00; margin-top: 10px; font-weight: bold;">⚠️ ${ring.name} has no uses remaining! Take a long rest to restore.</div>`;
+
+    } else {
+
+        resultHTML += `<div style="color: #ff6; margin-top: 10px;">Uses remaining: ${ring.currentUses}/${ring.maxUses}</div>`;
+
+    }
+
+    
+
+    weaponOutput.innerHTML = resultHTML;
+
+    
+
+    // Update ring status display
+
+    updateRingStatus();
+
+}
+
+
+
+function longRest() {
+
+    // Reset all equipped ring uses
+
+    equippedRings.forEach(ringId => {
+
+        if (magicRings[ringId]) {
+
+            magicRings[ringId].currentUses = magicRings[ringId].maxUses;
+
+        }
+
+    });
+
+    
+
+    // Reset poison arrows
+
+    poisonArrowsShort = 5;
+
+    poisonArrowsLong = 5;
+
+    updatePoisonCounter('short');
+
+    updatePoisonCounter('long');
+
+    
+
+    const weaponOutput = document.getElementById('weapon-output');
+
+    weaponOutput.innerHTML = '<div style="color: #0f0; font-size: 1.5em; font-weight: bold;">✨ Long Rest Complete! All resources restored. ✨</div>';
+
+    
+
+    updateRingStatus();
+
+}
