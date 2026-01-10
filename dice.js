@@ -81,9 +81,10 @@ function rollDie(sides) {
 
 function rollDamageDie(sides) {
     // Weighted roll for damage - higher chance of rolling 4 or higher
-    // Uses a quadratic distribution that favors higher values
+    // Uses sqrt transformation: sqrt(x) compresses low values and expands high values
+    // This makes higher die faces more probable when multiplied by sides
+    // Example: For d6, this gives ~75% chance of rolling 4+, vs ~50% for fair dice
     const random = Math.random();
-    // Square root makes higher values more likely
     const weightedRandom = Math.sqrt(random);
     return Math.floor(weightedRandom * sides) + 1;
 }
