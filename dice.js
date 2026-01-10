@@ -79,6 +79,16 @@ function rollDie(sides) {
     return Math.floor(Math.random() * sides) + 1;
 }
 
+function rollDamageDie(sides) {
+    // Weighted roll for damage - higher chance of rolling 4 or higher
+    // Uses sqrt transformation: sqrt(x) compresses low values and expands high values
+    // This makes higher die faces more probable when multiplied by sides
+    // Example: For d6, this gives ~75% chance of rolling 4+, vs ~50% for fair dice
+    const random = Math.random();
+    const weightedRandom = Math.sqrt(random);
+    return Math.floor(weightedRandom * sides) + 1;
+}
+
 function animateRoll(sides, callback) {
     const diceFace = document.getElementById('dice-face');
     const diceNumber = document.getElementById('dice-number');
@@ -323,7 +333,7 @@ function rollWeaponDice(dice, modifier, description, usePoisonArrow = false, ran
         const [count, sides] = diceStr. split('d').map(n => parseInt(n));
         let diceRolls = [];
         for (let i = 0; i < count; i++) {
-            const roll = rollDie(sides);
+            const roll = rollDamageDie(sides);
             diceRolls. push(roll);
             total += roll;
         }
@@ -508,7 +518,7 @@ function useRing(ringId) {
     let ringRolls = [];
     
     for (let i = 0; i < count; i++) {
-        const roll = rollDie(sides);
+        const roll = rollDamageDie(sides);
         ringRolls.push(roll);
         ringTotal += roll;
     }
