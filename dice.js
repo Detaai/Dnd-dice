@@ -20,7 +20,7 @@ failDiv.textContent = failPhrases[Math.floor(Math.random() * failPhrases.length)
 failDiv.style.display = 'block';
 failDiv.style.animation = 'flashFail 1s steps(2, start) infinite';
 setTimeout(() => {
-failDiv. style.display = 'none';
+failDiv.style.display = 'none';
 failDiv.style.animation = '';
 }, 2500);
 }
@@ -62,10 +62,10 @@ function switchToNumberInput() {
 const parent = diceCountInput.parentNode;
 const newInput = document.createElement('input');
 newInput.type = 'number';
-newInput. id = 'dice-count';
+newInput.id = 'dice-count';
 newInput.value = '1';
 newInput.min = '1';
-newInput.max = MAX_DICE_COUNT. toString();
+newInput.max = MAX_DICE_COUNT.toString();
 newInput.style.width = '50px';
 parent.replaceChild(newInput, diceCountInput);
 diceCountInput = newInput;
@@ -143,13 +143,13 @@ const diceFace = document.createElement('div');
 diceFace.className = 'dice-face';
 diceFace.style.position = 'relative';
 diceFace.style.width = '70px';
-diceFace. style.height = '70px';
-diceFace.style. display = 'flex';
+diceFace.style.height = '70px';
+diceFace.style.display = 'flex';
 diceFace.style.alignItems = 'center';
 diceFace.style.justifyContent = 'center';
 diceFace.style.background = 'none';
 diceFace.style.margin = '0 5px';
-diceFace. innerHTML = `
+diceFace.innerHTML = `
        <div class="dice-shape" style="position: absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;">${getDiceShape(sides)}</div>
        <span class="dice-number" style="position:relative;font-size:2em;color:#fff;z-index:1;">? </span>
    `;
@@ -160,7 +160,7 @@ const diceNumber = diceFace.querySelector('.dice-number');
 if (globalLoaded) {
 diceNumber.textContent = sides;
 } else if (globalLowest) {
-diceNumber. textContent = 1;
+diceNumber.textContent = 1;
 }
 });
 
@@ -185,7 +185,7 @@ let frames = 20;
 let interval = 30;
 let frameCount = 0;
 const rollAnim = setInterval(() => {
-diceNumber.textContent = Math. floor(Math.random() * sides) + 1;
+diceNumber.textContent = Math.floor(Math.random() * sides) + 1;
 frameCount++;
 if (frameCount >= frames) {
 clearInterval(rollAnim);
@@ -227,7 +227,7 @@ diceSelectors.innerHTML = '';
 for (let i = 0; i < count; i++) {
 const select = document.createElement('select');
 select.className = 'dice-select';
-diceTypes. forEach(type => {
+diceTypes.forEach(type => {
 const option = document.createElement('option');
 option.value = type;
 option.textContent = `d${type}`;
@@ -260,12 +260,12 @@ let failTriggered = false;
 
 diceFaces.forEach((diceFace, i) => {
 const diceNumber = diceFace.querySelector('.dice-number');
-diceFace.classList. add('rolling');
+diceFace.classList.add('rolling');
 let frames = 20;
 let interval = 30;
 let frameCount = 0;
 const rollAnim = setInterval(() => {
-diceNumber.textContent = Math.floor(Math. random() * sidesArr[i]) + 1;
+diceNumber.textContent = Math.floor(Math.random() * sidesArr[i]) + 1;
 frameCount++;
 if (frameCount >= frames) {
 clearInterval(rollAnim);
@@ -289,7 +289,7 @@ diceTotal.textContent = `Total: ${results.reduce((a, b) => a + b, 0)}`;
 }
 
 document.getElementById('roll-btn').addEventListener('click', () => {
-const selects = document.querySelectorAll('. dice-select');
+const selects = document.querySelectorAll('.dice-select');
 if (selects.length === 0) {
 return; // No dice to roll
 }
@@ -329,13 +329,12 @@ return;
 let total = modifier;
 let rolls = [];
 
-dice. forEach(diceStr => {
-const [count, sides] = diceStr. split('d').map(n => parseInt(n));
+dice.forEach(diceStr => {
+const [count, sides] = diceStr.split('d').map(n => parseInt(n));
 let diceRolls = [];
 for (let i = 0; i < count; i++) {
-            const roll = rollDie(sides);
-            const roll = rollDamageDie(sides);
-diceRolls. push(roll);
+const roll = rollDamageDie(sides);
+diceRolls.push(roll);
 total += roll;
 }
 rolls.push({ dice: diceStr, rolls: diceRolls });
@@ -465,14 +464,14 @@ const ringStatus = document.getElementById('ring-status');
 const equippedRingsDiv = document.getElementById('equipped-rings');
 
 if (equippedRings.length === 0) {
-ringStatus. style.display = 'none';
+ringStatus.style.display = 'none';
 return;
 }
 
 ringStatus.style.display = 'block';
 
 let html = '';
-equippedRings. forEach(ringId => {
+equippedRings.forEach(ringId => {
 const ring = magicRings[ringId];
 if (ring) {
 html += `
@@ -500,7 +499,7 @@ return;
 
 if (ring.currentUses <= 0) {
 const weaponOutput = document.getElementById('weapon-output');
-weaponOutput. innerHTML = '<div style="color: #f00;">This ring has no uses remaining!  Take a long rest to restore uses.</div>';
+weaponOutput.innerHTML = '<div style="color: #f00;">This ring has no uses remaining!  Take a long rest to restore uses.</div>';
 return;
 }
 
@@ -519,14 +518,13 @@ let ringTotal = 0;
 let ringRolls = [];
 
 for (let i = 0; i < count; i++) {
-        const roll = rollDie(sides);
-        const roll = rollDamageDie(sides);
+const roll = rollDamageDie(sides);
 ringRolls.push(roll);
 ringTotal += roll;
 }
 
 // Apply damage modifier and ensure minimum damage of 1
-const finalDamage = Math.max(1, Math.floor(ringTotal * ring. damageModifier));
+const finalDamage = Math.max(1, Math.floor(ringTotal * ring.damageModifier));
 
 // Decrement uses
 ring.currentUses--;
