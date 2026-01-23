@@ -184,6 +184,9 @@
             <!-- Weapons Card (Secondary actions) -->
             <div class="card" id="weapons-card">
                 <h3>Weapons</h3>
+                <div class="card-actions">
+                    <button class="weapon-btn secondary-action" onclick="openMagicWeaponsModal()">Magic Weapons</button>
+                </div>
                 <div class="card-subsection">
                     <h4 style="margin:0 0 8px 0; color:#dfe6e9;">Short Range</h4>
                     <div class="card-actions">
@@ -239,6 +242,19 @@
 
             </div>
 
+        </div>
+
+        <!-- Magic Weapons Selection Modal -->
+        <div id="weapons-selector-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;">
+            <div style="background: #333; padding: 30px; border-radius: 10px; border: 2px solid #888; max-width: 500px; width: 90%;">
+                <h3 style="margin-top: 0; color: #0f0;">Select Magic Weapons (Max 3)</h3>
+                <div id="weapons-slot-counter" style="margin: 10px 0; color: #fff; font-weight: bold;"></div>
+                <div id="weapons-list" style="margin: 20px 0; text-align: left;"></div>
+                <div style="margin-top: 20px; text-align: center;">
+                    <button class="weapon-btn" onclick="confirmMagicWeaponSelection()" style="margin: 5px;">Confirm</button>
+                    <button class="weapon-btn" onclick="closeMagicWeaponsModal()" style="margin: 5px;">Cancel</button>
+                </div>
+            </div>
         </div>
     </div>
     
