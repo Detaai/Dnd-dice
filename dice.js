@@ -824,6 +824,17 @@ function initTrackers() {
 
 // call initTrackers at bottom of file after other init code runs
 
+// Toggle the bottom bumber/footer
+function toggleBumber() {
+    const b = document.getElementById('bumber');
+    if (!b) return;
+    if (b.style.display === 'none') {
+        b.style.display = 'flex';
+    } else {
+        b.style.display = 'none';
+    }
+}
+
 // Short Range Attacks
 function rollShortRangeFirstTurn() {
 const description = 'Short Range - First Turn<br>Faerie Fire (advantage) + Hunters Mark (1d6) + Shortbow + Dread Ambusher + 1d6 Magic + Sharpshooter';
