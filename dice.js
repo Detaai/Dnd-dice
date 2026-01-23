@@ -538,26 +538,214 @@ weaponOutput.innerHTML = `
     recordRoll({ total, title: 'Initiative', breakdownHtml: `<div style="color:#fff">1d20: [${roll}] + 2</div>`, isCritSuccess, isCritFail });
 }
 
+// Duplo Quiver: Roll damage twice
+function rollWeaponDiceWithDuploQuiver(dice, modifier, description) {
+    const weaponOutput = document.getElementById('weapon-output');
+    weaponOutput.innerHTML = '<div style="color: #fff;">Rolling with Duplo Quiver...</div>';
+    
+    // Perform two independent damage calculations
+    const roll1 = performSingleDamageRoll(dice, modifier, description);
+    const roll2 = performSingleDamageRoll(dice, modifier, description);
+    
+    // Display both results
+    let resultHTML = `<div style="margin-bottom: 15px; color: #0f0; font-weight: bold;">🏹 DUPLO QUIVER ACTIVE 🏹</div>`;
+    resultHTML += `<div style="margin-bottom: 15px; color: #fff; font-weight: bold;">${description}</div>`;
+    resultHTML += `<div style="border: 2px solid #0f0; padding: 15px; margin: 10px 0; border-radius: 8px; background: rgba(0, 255, 0, 0.05);">`;
+    resultHTML += `<div style="color: #0ff; font-weight: bold; margin-bottom: 8px;">Roll 1:</div>`;
+    resultHTML += roll1.detailsHTML;
+    resultHTML += `<div style="margin-top: 10px; color: #ff0; font-size: 1.2em; font-weight: bold;">Total: ${roll1.total}</div>`;
+    resultHTML += `</div>`;
+    resultHTML += `<div style="border: 2px solid #0f0; padding: 15px; margin: 10px 0; border-radius: 8px; background: rgba(0, 255, 0, 0.05);">`;
+    resultHTML += `<div style="color: #0ff; font-weight: bold; margin-bottom: 8px;">Roll 2:</div>`;
+    resultHTML += roll2.detailsHTML;
+    resultHTML += `<div style="margin-top: 10px; color: #ff0; font-size: 1.2em; font-weight: bold;">Total: ${roll2.total}</div>`;
+    resultHTML += `</div>`;
+    
+    weaponOutput.innerHTML = resultHTML;
+    
+    // Record both rolls in history
+    recordRoll({ total: `Roll 1: ${roll1.total} | Roll 2: ${roll2.total}`, title: description + ' (Duplo Quiver)', breakdownHtml: resultHTML, isCritSuccess: false, isCritFail: false });
+}
+
+// Helper function to perform a single damage roll calculation
+function performSingleDamageRoll(dice, modifier, description) {
+    // generate a unique roll id for this calculation
+    const rollId = generateRollId();
+    
+    // Auto-apply a magic ring bonus (if any equipped and has uses remaining)
+    let ringBonusTotal = 0;
+    let ringUsedId = null;
+    const nextRingId = getNextAvailableRing();
+    let ringRollDetails = null;
+    if (nextRingId) {
+        const ring = magicRings[nextRingId];
+        const diceMatch = ring.damage.match(/^(\d+)d(\d+)$/);
+        if (diceMatch) {
+            const count = parseInt(diceMatch[1]);
+            const sides = parseInt(diceMatch[2]);
+            let ringTotal = 0;
+            let ringRolls = [];
+            for (let i = 0; i < count; i++) {
+                const r = rollDamageDie(sides);
+                ringRolls.push(r);
+                ringTotal += r;
+            }
+            const finalDamage = Math.max(1, Math.floor(ringTotal * ring.damageModifier));
+            // consume a use
+            ring.currentUses = Math.max(0, ring.currentUses - 1);
+            ringBonusTotal = finalDamage;
+            ringUsedId = nextRingId;
+            ringRollDetails = { id: nextRingId, name: ring.name, rolls: ringRolls, total: ringTotal, final: finalDamage };
+        }
+    }
+    
+    // Parse dice notation and calculate damage
+    let total = modifier + ringBonusTotal;
+    let rolls = [];
+    
+    dice.forEach(diceStr => {
+        const [count, sides] = diceStr.split('d').map(n => parseInt(n));
+        let diceRolls = [];
+        for (let i = 0; i < count; i++) {
+            const roll = rollDamageDie(sides);
+            diceRolls.push(roll);
+            total += roll;
+        }
+        rolls.push({ dice: diceStr, rolls: diceRolls });
+    });
+    
+    // Build details HTML
+    let detailsHTML = '';
+    rolls.forEach(r => {
+        detailsHTML += `<div style="color: #fff; margin: 5px 0;">${r.dice}: [${r.rolls.join(', ')}]</div>`;
+    });
+    
+    // Apply active-effect bonus dice (e.g., Hunter's Mark, Zephyr Strike)
+    let hunterDetailsHTML = '';
+    let skippedEffectsHTML = '';
+    const potentialBonusEffects = activeEffects.filter(e => e && e.bonusDice);
+    const toApply = potentialBonusEffects.filter(e => e.state === 'active' && (!Array.isArray(e.appliedRolls) || e.appliedRolls.indexOf(rollId) === -1));
+    const toSkip = potentialBonusEffects.filter(e => !(e.state === 'active' && (!Array.isArray(e.appliedRolls) || e.appliedRolls.indexOf(rollId) === -1)));
+    
+    const markedEffects = [];
+    let removedAny = false;
+    try {
+        toApply.forEach(b => {
+            if (!Array.isArray(b.appliedRolls)) b.appliedRolls = [];
+            if (b.appliedRolls.indexOf(rollId) === -1) {
+                b.appliedRolls.push(rollId);
+                markedEffects.push(b);
+            }
+        });
+        
+        markedEffects.forEach(b => {
+            const match = b.bonusDice.match(/^(\d+)d(\d+)$/);
+            if (match) {
+                const c = parseInt(match[1], 10);
+                const s = parseInt(match[2], 10);
+                const rollsArr = [];
+                let subTotal = 0;
+                for (let i = 0; i < c; i++) {
+                    const r = rollDie(s);
+                    rollsArr.push(r);
+                    subTotal += r;
+                }
+                total += subTotal;
+                hunterDetailsHTML += `<div style="color:#fff; margin: 5px 0;">${b.name} Bonus (${b.bonusDice}): [${rollsArr.join(', ')}] = ${subTotal}</div>`;
+                
+                if (b.oneTime) {
+                    b.state = 'consumed';
+                    removedAny = true;
+                }
+            }
+        });
+    } catch (err) {
+        console.error('Error applying bonus effects:', err);
+        markedEffects.forEach(b => {
+            if (Array.isArray(b.appliedRolls)) {
+                const idx = b.appliedRolls.indexOf(rollId);
+                if (idx !== -1) b.appliedRolls.splice(idx, 1);
+            }
+            if (b.oneTime && b.state === 'consumed') {
+                b.state = 'active';
+            }
+        });
+        skippedEffectsHTML += `<div style="color:#f99; margin:4px 0;">Error applying some effects; they were not applied.</div>`;
+    }
+    
+    toSkip.forEach(b => {
+        const appliedHere = Array.isArray(b.appliedRolls) && b.appliedRolls.indexOf(rollId) !== -1;
+        const reason = b.state === 'consumed' ? 'already consumed' : (appliedHere ? 'already applied to this roll' : null);
+        if (reason) {
+            skippedEffectsHTML += `<div style="color:#f99; margin:4px 0;">${b.name}: ${reason} — not applied.</div>`;
+        }
+    });
+    
+    if (removedAny) {
+        updateActiveEffectsUI();
+        updateAttackHighlights();
+    }
+    
+    detailsHTML += hunterDetailsHTML;
+    if (skippedEffectsHTML) detailsHTML += `<div style="margin-top:8px;color:#f88;font-size:0.95em;">Effects skipped:<div style="margin-top:6px;">${skippedEffectsHTML}</div></div>`;
+    
+    // Add ring bonus details if applicable
+    if (ringUsedId && ringRollDetails) {
+        detailsHTML += `<div style="color: #fff; margin: 10px 0;">Ring Bonus - ${ringRollDetails.name}: [${ringRollDetails.rolls.join(', ')}] = ${ringRollDetails.total} → ${ringRollDetails.final}</div>`;
+        updateRingStatus();
+    }
+    
+    return { total, detailsHTML, rollId };
+}
+
 // Short Range Attacks
 function rollShortRangeFirstTurn() {
-const description = 'Short Range - First Turn<br>Faerie Fire (advantage) + Hunters Mark + Short Bow + Sharp Shoot';
-rollWeaponDice(['3d6', '1d8'], 12, description);
+    const description = 'Short Range - First Turn<br>Faerie Fire (advantage) + Hunters Mark + Short Bow + Sharp Shoot';
+    const dice = ['3d6', '1d8'];
+    const modifier = 12;
+    
+    if (isWeaponEquipped('duplo-quiver')) {
+        rollWeaponDiceWithDuploQuiver(dice, modifier, description);
+    } else {
+        rollWeaponDice(dice, modifier, description);
+    }
 }
 
 function rollShortRangeOtherTurns() {
-const description = 'Short Range - Other Turns<br>Short Bow + Normal Arrow + Hunters Mark';
-rollWeaponDice(['2d6'], 2, description);
+    const description = 'Short Range - Other Turns<br>Short Bow + Normal Arrow + Hunters Mark';
+    const dice = ['2d6'];
+    const modifier = 2;
+    
+    if (isWeaponEquipped('duplo-quiver')) {
+        rollWeaponDiceWithDuploQuiver(dice, modifier, description);
+    } else {
+        rollWeaponDice(dice, modifier, description);
+    }
 }
 
 // Long Range Attacks
 function rollLongRangeFirstTurn() {
-const description = 'Long Range - First Turn<br>Faerie Fire (advantage) + Hunters Mark + Long Bow + Sharp Shoot';
-rollWeaponDice(['2d6', '2d8'], 13, description);
+    const description = 'Long Range - First Turn<br>Faerie Fire (advantage) + Hunters Mark + Long Bow + Sharp Shoot';
+    const dice = ['2d6', '2d8'];
+    const modifier = 13;
+    
+    if (isWeaponEquipped('duplo-quiver')) {
+        rollWeaponDiceWithDuploQuiver(dice, modifier, description);
+    } else {
+        rollWeaponDice(dice, modifier, description);
+    }
 }
 
 function rollLongRangeOtherTurns() {
-const description = 'Long Range - Other Turns<br>Long Bow + Normal Arrow + Hunters Mark + Sharp Shooter';
-rollWeaponDice(['2d6', '1d8'], 13, description);
+    const description = 'Long Range - Other Turns<br>Long Bow + Normal Arrow + Hunters Mark + Sharp Shooter';
+    const dice = ['2d6', '1d8'];
+    const modifier = 13;
+    
+    if (isWeaponEquipped('duplo-quiver')) {
+        rollWeaponDiceWithDuploQuiver(dice, modifier, description);
+    } else {
+        rollWeaponDice(dice, modifier, description);
+    }
 }
 
 // Magic Ring System
@@ -761,6 +949,100 @@ function longRest() {
     currentHealth = maxHealth;
     saveHealth();
     updateHealthUI();
+}
+
+// --- Magic Weapons System ---
+const MAX_EQUIPPED_WEAPONS = 3;
+
+const magicWeapons = {
+    'duplo-quiver': {
+        id: 'duplo-quiver',
+        name: 'Duplo Quiver',
+        description: 'If you knock on its wood twice your arrow doubles! dealing two attacks!',
+        effect: 'double-damage-rolls'
+    },
+    'find-another': {
+        id: 'find-another',
+        name: 'Find another!',
+        description: 'Find another magic weapon!',
+        effect: 'none'
+    }
+};
+
+let equippedWeapons = [];
+let tempSelectedWeapons = [];
+
+function openMagicWeaponsModal() {
+    const modal = document.getElementById('weapons-selector-modal');
+    // Copy current equipped state to temp selection
+    tempSelectedWeapons = [...equippedWeapons];
+    updateMagicWeaponsUI();
+    modal.style.display = 'flex';
+}
+
+function closeMagicWeaponsModal() {
+    const modal = document.getElementById('weapons-selector-modal');
+    modal.style.display = 'none';
+}
+
+function toggleMagicWeapon(weaponId) {
+    const index = tempSelectedWeapons.indexOf(weaponId);
+    if (index > -1) {
+        // Unequip
+        tempSelectedWeapons.splice(index, 1);
+    } else {
+        // Try to equip
+        if (tempSelectedWeapons.length >= MAX_EQUIPPED_WEAPONS) {
+            const weaponOutput = document.getElementById('weapon-output');
+            weaponOutput.innerHTML = `<div style="color: #f00;">You can only equip up to ${MAX_EQUIPPED_WEAPONS} magic weapons!</div>`;
+            return;
+        }
+        tempSelectedWeapons.push(weaponId);
+    }
+    updateMagicWeaponsUI();
+}
+
+function confirmMagicWeaponSelection() {
+    // Apply temp selection to actual equipped weapons
+    equippedWeapons = [...tempSelectedWeapons];
+    closeMagicWeaponsModal();
+    
+    const weaponOutput = document.getElementById('weapon-output');
+    weaponOutput.innerHTML = '<div style="color: #0f0; font-weight: bold;">Magic weapons updated!</div>';
+}
+
+function updateMagicWeaponsUI() {
+    const weaponsList = document.getElementById('weapons-list');
+    const slotCounter = document.getElementById('weapons-slot-counter');
+    
+    // Update slot counter
+    slotCounter.textContent = `${tempSelectedWeapons.length}/${MAX_EQUIPPED_WEAPONS} equipped`;
+    
+    let html = '';
+    for (const weaponId in magicWeapons) {
+        const weapon = magicWeapons[weaponId];
+        const isEquipped = tempSelectedWeapons.includes(weaponId);
+        
+        html += `
+            <label style="display: block; margin: 10px 0; padding: 10px; background: ${isEquipped ? '#4a4' : '#444'}; border-radius: 5px; cursor: pointer; border: 2px solid ${isEquipped ? '#0f0' : 'transparent'};">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div style="flex: 1;" onclick="toggleMagicWeapon('${weaponId}')">
+                        <div style="color: #fff; font-weight: bold; display: flex; align-items: center; gap: 8px;">
+                            ${weapon.name}
+                            ${isEquipped ? '<span style="color: #0f0; font-size: 0.9em;">✓ EQUIPPED</span>' : ''}
+                        </div>
+                        <div style="color: #aaa; font-size: 0.9em; margin-top: 5px;">${weapon.description}</div>
+                    </div>
+                </div>
+            </label>
+        `;
+    }
+    
+    weaponsList.innerHTML = html;
+}
+
+function isWeaponEquipped(weaponId) {
+    return equippedWeapons.includes(weaponId);
 }
 
 // --- Magic UI: Cantrips and Disguise Self persistence ---
