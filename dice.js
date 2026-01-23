@@ -142,23 +142,29 @@ function rollDamageDie(sides) {
 }
 
 function animateRoll(sides, callback) {
-const diceFace = document.getElementById('dice-face');
-const diceNumber = document.getElementById('dice-number');
-diceFace.classList.add('rolling');
-let frames = 20;
-let interval = 30;
-let count = 0;
-const rollAnim = setInterval(() => {
-diceNumber.textContent = Math.floor(Math.random() * sides) + 1;
-count++;
-if (count >= frames) {
-clearInterval(rollAnim);
-diceFace.classList.remove('rolling');
-const result = rollDie(sides);
-diceNumber.textContent = result;
-if (callback) callback(result);
-}
-}, interval);
+    const diceFace = document.getElementById('dice-face');
+    const diceNumber = document.getElementById('dice-number');
+    // If the specific animation DOM nodes are not present, fall back to a simple roll
+    if (!diceFace || !diceNumber) {
+        const result = rollDie(sides);
+        if (callback) callback(result);
+        return;
+    }
+    diceFace.classList.add('rolling');
+    let frames = 20;
+    let interval = 30;
+    let count = 0;
+    const rollAnim = setInterval(() => {
+        diceNumber.textContent = Math.floor(Math.random() * sides) + 1;
+        count++;
+        if (count >= frames) {
+            clearInterval(rollAnim);
+            diceFace.classList.remove('rolling');
+            const result = rollDie(sides);
+            diceNumber.textContent = result;
+            if (callback) callback(result);
+        }
+    }, interval);
 }
 
 // Loaded mode toggle
@@ -363,6 +369,42 @@ animateRollDiceMulti(sidesArr, loaded);
 
 // Character Weapon System
 
+/*
+Math & Outcome Notes (for developer view only):
+
+- rollWeaponDice(dice, modifier, description):
+    - `dice` is an array of dice notation strings (e.g., ['2d6','1d8']).
+    - `modifier` is a flat numeric bonus added to the total (e.g., attack bonuses or static modifiers).
+    - The function computes an initial `total` starting from `modifier` plus any `ringBonusTotal`.
+        * ringBonusTotal: if a magic ring is available, we roll its damage dice and apply its damageModifier (e.g., ÷2 for Echo Band), then add that final value to the running total.
+
+- Dice rolling:
+    - For each dice notation `XdY`, we roll `X` times using `rollDamageDie(Y)` (a weighted damage roll that biases higher outcomes).
+    - Each die roll is added to `total` and recorded in `rolls` for display.
+
+- Active effects (bonus dice like Hunter's Mark or Zephyr Strike):
+    - We collect `activeEffects` that include `bonusDice` and filter only those that are `state === 'active'` and not already applied to this roll (tracked via `appliedRolls` array and `rollId`).
+    - For each chosen bonus effect we roll its `bonusDice` (fair `rollDie`) and add the sub-total to `total`.
+    - If an effect is `oneTime`, we mark it `state = 'consumed'` after applying.
+
+- Dupo Quiver special case:
+    - If the `dupo-quiver` is equipped, we perform two independent damage calculations (Shot A and Shot B):
+        * Shot A includes the current `ringBonusTotal` and its own application of active bonus dice (and marks those effect applications with the original `rollId`).
+        * Shot B is an independent roll (separate `rollId`) and has bonus effects applied separately (so effects that can apply to both will be rolled and marked twice if appropriate).
+    - Both shots are presented to the user with full breakdowns (individual dice arrays, applied bonus dice, and totals). The user then chooses which shot to accept. Choosing records that chosen shot to `recordRoll()` and updates the Results output.
+
+- Recording & UI:
+    - After a completed non-Dupo roll we show a breakdown of individual dice, any ring details, any applied bonus effect breakdowns, and the final `total`.
+    - We call `recordRoll()` with `{ total, title, breakdownHtml, isCritSuccess, isCritFail }` so the roll history UI can display the result.
+
+Notes:
+    - `rollDamageDie()` intentionally biases damage rolls upward using `Math.sqrt(Math.random())` to make high faces more likely for damage (design choice).
+    - `rollDie()` is a fair die used for effect bonus dice and crit detection (e.g., d20 checks).
+    - Effect application is guarded with marking (`appliedRolls`) to avoid double-applying the same effect to a single roll.
+
+Keep this comment here for quick reference when adjusting damage math or adding new special weapon behavior.
+*/
+
 function rollWeaponDice(dice, modifier, description) {
 const weaponOutput = document.getElementById('weapon-output');
 weaponOutput.innerHTML = '<div style="color: #fff;">Rolling...</div>';
@@ -396,6 +438,119 @@ if (nextRingId) {
         ringUsedId = nextRingId;
         ringRollDetails = { id: nextRingId, name: ring.name, rolls: ringRolls, total: ringTotal, final: finalDamage };
     }
+}
+
+// Special handling: Dupo Quiver (double shot) if equipped
+if (Array.isArray(equippedWeapons) && equippedWeapons.indexOf('dupo-quiver') !== -1) {
+    // First shot (includes ring bonus if any)
+    const rollAId = rollId;
+    let totalA = modifier + ringBonusTotal;
+    const rollsA = [];
+    dice.forEach(diceStr => {
+        const [count, sides] = diceStr.split('d').map(n => parseInt(n));
+        const arr = [];
+        for (let i = 0; i < count; i++) {
+            const r = rollDamageDie(sides);
+            arr.push(r);
+            totalA += r;
+        }
+        rollsA.push({ dice: diceStr, rolls: arr });
+    });
+
+    // Apply bonus effects to shot A (mark by rollAId)
+    let hunterAHtml = '';
+    try {
+        const potential = activeEffects.filter(e => e && e.bonusDice);
+        const toApplyA = potential.filter(e => e.state === 'active' && (!Array.isArray(e.appliedRolls) || e.appliedRolls.indexOf(rollAId) === -1));
+        toApplyA.forEach(b => {
+            if (!Array.isArray(b.appliedRolls)) b.appliedRolls = [];
+            if (b.appliedRolls.indexOf(rollAId) === -1) b.appliedRolls.push(rollAId);
+            const match = b.bonusDice.match(/^(\d+)d(\d+)$/);
+            if (match) {
+                const c = parseInt(match[1], 10);
+                const s = parseInt(match[2], 10);
+                const rarr = [];
+                let st = 0;
+                for (let i = 0; i < c; i++) { const rv = rollDie(s); rarr.push(rv); st += rv; }
+                totalA += st;
+                hunterAHtml += `<div style="color:#fff; margin:5px 0">${b.name} Bonus (${b.bonusDice}): [${rarr.join(', ')}] = ${st}</div>`;
+                if (b.oneTime) b.state = 'consumed';
+            }
+        });
+    } catch (e) {
+        console.error('Dupo A apply error', e);
+    }
+
+    // Second shot (no ring bonus) as independent roll
+    const rollBId = generateRollId();
+    let totalB = modifier;
+    const rollsB = [];
+    dice.forEach(diceStr => {
+        const [count, sides] = diceStr.split('d').map(n => parseInt(n));
+        const arr = [];
+        for (let i = 0; i < count; i++) {
+            const r = rollDamageDie(sides);
+            arr.push(r);
+            totalB += r;
+        }
+        rollsB.push({ dice: diceStr, rolls: arr });
+    });
+
+    // Apply bonus effects to shot B (mark by rollBId)
+    let hunterBHtml = '';
+    try {
+        const potential = activeEffects.filter(e => e && e.bonusDice);
+        const toApplyB = potential.filter(e => e.state === 'active' && (!Array.isArray(e.appliedRolls) || e.appliedRolls.indexOf(rollBId) === -1));
+        toApplyB.forEach(b => {
+            if (!Array.isArray(b.appliedRolls)) b.appliedRolls = [];
+            if (b.appliedRolls.indexOf(rollBId) === -1) b.appliedRolls.push(rollBId);
+            const match = b.bonusDice.match(/^(\d+)d(\d+)$/);
+            if (match) {
+                const c = parseInt(match[1], 10);
+                const s = parseInt(match[2], 10);
+                const rarr = [];
+                let st = 0;
+                for (let i = 0; i < c; i++) { const rv = rollDie(s); rarr.push(rv); st += rv; }
+                totalB += st;
+                hunterBHtml += `<div style="color:#fff; margin:5px 0">${b.name} Bonus (${b.bonusDice}): [${rarr.join(', ')}] = ${st}</div>`;
+                if (b.oneTime) b.state = 'consumed';
+            }
+        });
+    } catch (e) {
+        console.error('Dupo B apply error', e);
+    }
+
+    // Build display HTML for both shots and provide selection buttons
+    let aHtml = `<div style="color:#fff; margin:5px 0; font-weight:700">Shot A</div>`;
+    rollsA.forEach(r => { aHtml += `<div style="color:#fff;margin:4px 0;">${r.dice}: [${r.rolls.join(', ')}]</div>`; });
+    aHtml += hunterAHtml;
+    aHtml += `<div style="margin-top:8px;color:#ff0;font-weight:700;">Total A: ${totalA}</div>`;
+
+    let bHtml = `<div style="color:#fff; margin:5px 0; font-weight:700">Shot B</div>`;
+    rollsB.forEach(r => { bHtml += `<div style="color:#fff;margin:4px 0;">${r.dice}: [${r.rolls.join(', ')}]</div>`; });
+    bHtml += hunterBHtml;
+    bHtml += `<div style="margin-top:8px;color:#ff0;font-weight:700;">Total B: ${totalB}</div>`;
+
+    // store for chooser
+    _lastDupoA = { total: totalA, html: aHtml };
+    _lastDupoB = { total: totalB, html: bHtml };
+    _lastDupoDesc = description;
+
+    let combined = `<div style="margin-bottom:15px;color:#0f0;font-weight:bold;">${description} — Dupo Quiver (two shots)</div>`;
+    combined += `<div style="display:flex;gap:20px;flex-wrap:wrap;">`;
+    combined += `<div style="flex:1;min-width:220px;background:#222;padding:10px;border-radius:6px;">${aHtml}<div style="text-align:center;margin-top:10px;"><button class=\"weapon-btn\" onclick=\"chooseDupoResult('a')\">Choose Shot A</button></div></div>`;
+    combined += `<div style="flex:1;min-width:220px;background:#222;padding:10px;border-radius:6px;">${bHtml}<div style="text-align:center;margin-top:10px;"><button class=\"weapon-btn\" onclick=\"chooseDupoResult('b')\">Choose Shot B</button></div></div>`;
+    combined += `</div>`;
+
+    // show ring details if used
+    if (ringUsedId && ringRollDetails) {
+        combined += `<div style="color:#fff;margin-top:10px;">Ring Bonus - ${ringRollDetails.name}: [${ringRollDetails.rolls.join(', ')}] = ${ringRollDetails.total} → ${ringRollDetails.final}</div>`;
+        updateRingStatus();
+    }
+
+    const wo = document.getElementById('weapon-output');
+    if (wo) wo.innerHTML = combined;
+    return;
 }
 
 // Parse dice notation (e.g., "3d6", "1d8") and include ring bonus in the total
@@ -525,7 +680,7 @@ if (ringUsedId && ringRollDetails) {
 function rollInitiative() {
 const weaponOutput = document.getElementById('weapon-output');
 const roll = rollDie(20);
-const total = roll + 2;
+const total = roll + 6;
 weaponOutput.innerHTML = `
        <div style="margin-bottom: 15px; color: #0f0; font-weight: bold;">Initiative Roll</div>
        <div style="color: #fff; margin: 5px 0;">1d20: [${roll}]</div>
@@ -535,29 +690,165 @@ weaponOutput.innerHTML = `
     // record initiative in history and flag crits
     const isCritSuccess = (roll === 20);
     const isCritFail = (roll === 1);
-    recordRoll({ total, title: 'Initiative', breakdownHtml: `<div style="color:#fff">1d20: [${roll}] + 2</div>`, isCritSuccess, isCritFail });
+    recordRoll({ total, title: 'Initiative', breakdownHtml: `<div style="color:#fff">1d20: [${roll}] + 6</div>`, isCritSuccess, isCritFail });
 }
+
+// --- Initiative tracker persistence & UI ---
+const INIT_KEY = 'initiativeList';
+let initiativeList = [];
+let lastInitiativeValue = null;
+
+function loadInitiative() {
+    try {
+        const raw = localStorage.getItem(INIT_KEY);
+        initiativeList = raw ? JSON.parse(raw) : [];
+    } catch (e) {
+        initiativeList = [];
+    }
+    updateInitiativeUI();
+}
+
+function saveInitiative() {
+    localStorage.setItem(INIT_KEY, JSON.stringify(initiativeList || []));
+}
+
+function updateInitiativeUI() {
+    const listEl = document.getElementById('initiative-list');
+    if (!listEl) return;
+    if (!Array.isArray(initiativeList) || initiativeList.length === 0) {
+        listEl.innerHTML = '<div style="color:var(--muted);">No entries.</div>';
+        return;
+    }
+    const html = initiativeList.map((e, i) => {
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 4px;border-bottom:1px solid rgba(255,255,255,0.02);">` +
+            `<div><strong style="color:#ffd">${e.name || 'Unnamed'}</strong> — ${e.value}</div>` +
+            `<div><button class=\"weapon-btn\" onclick=\"removeInitiativeEntry(${i})\">Remove</button></div>` +
+            `</div>`;
+    }).join('');
+    listEl.innerHTML = html;
+}
+
+function addInitiativeEntry(name, value) {
+    const entry = { name: name || '', value: Number(value) || 0, time: new Date().toISOString() };
+    initiativeList.push(entry);
+    saveInitiative();
+    updateInitiativeUI();
+}
+
+function removeInitiativeEntry(index) {
+    initiativeList.splice(index, 1);
+    saveInitiative();
+    updateInitiativeUI();
+}
+
+function clearInitiative() {
+    if (!confirm('Clear all initiative entries?')) return;
+    initiativeList = [];
+    saveInitiative();
+    updateInitiativeUI();
+}
+
+function sortInitiativeDesc() {
+    initiativeList.sort((a,b) => b.value - a.value);
+    saveInitiative();
+    updateInitiativeUI();
+}
+
+function addLastInitiative() {
+    const nameInput = document.getElementById('initiative-name');
+    const name = nameInput ? nameInput.value.trim() : '';
+    if (lastInitiativeValue === null) {
+        alert('No initiative roll available. Click "Roll Initiative" first.');
+        return;
+    }
+    addInitiativeEntry(name || document.querySelector('.char-name')?.textContent?.trim(), lastInitiativeValue);
+    if (nameInput) nameInput.value = '';
+}
+
+// modify rollInitiative to expose lastInitiativeValue for tracker use
+const _oldRollInitiative = rollInitiative;
+function rollInitiative() {
+    const weaponOutput = document.getElementById('weapon-output');
+    const roll = rollDie(20);
+    const total = roll + 2;
+    lastInitiativeValue = total;
+    if (weaponOutput) {
+        weaponOutput.innerHTML = `\n       <div style="margin-bottom: 15px; color: #0f0; font-weight: bold;">Initiative Roll</div>\n       <div style="color: #fff; margin: 5px 0;">1d20: [${roll}]</div>\n       <div style="color: #fff; margin:  5px 0;">Modifier: +6</div>\n       <div style="margin-top: 15px; color: #ff0; font-size: 1.3em; font-weight: bold;">Initiative: ${total}</div>\n    `;
+    }
+    const isCritSuccess = (roll === 20);
+    const isCritFail = (roll === 1);
+    recordRoll({ total, title: 'Initiative', breakdownHtml: `<div style="color:#fff">1d20: [${roll}] + 6</div>`, isCritSuccess, isCritFail });
+}
+
+// --- Currency tracker ---
+const CURRENCY_KEY = 'characterCurrency';
+let currency = { gp: 0, sp: 0, cp: 0 };
+
+function loadCurrency() {
+    try {
+        const raw = localStorage.getItem(CURRENCY_KEY);
+        currency = raw ? JSON.parse(raw) : { gp: 0, sp: 0, cp: 0 };
+    } catch (e) {
+        currency = { gp: 0, sp: 0, cp: 0 };
+    }
+    updateCurrencyUI();
+}
+
+function saveCurrency() {
+    localStorage.setItem(CURRENCY_KEY, JSON.stringify(currency));
+}
+
+function updateCurrencyUI() {
+    const gp = document.getElementById('currency-gp');
+    const sp = document.getElementById('currency-sp');
+    const cp = document.getElementById('currency-cp');
+    if (gp) gp.textContent = String(currency.gp || 0);
+    if (sp) sp.textContent = String(currency.sp || 0);
+    if (cp) cp.textContent = String(currency.cp || 0);
+}
+
+function changeCurrency(type, delta) {
+    if (!['gp','sp','cp'].includes(type)) return;
+    currency[type] = (currency[type] || 0) + Number(delta || 0);
+    // clamp to integer and non-negative for now
+    currency[type] = Math.max(0, Math.floor(currency[type]));
+    saveCurrency();
+    updateCurrencyUI();
+}
+
+// initialization for new features
+function initTrackers() {
+    loadInitiative();
+    loadCurrency();
+}
+
+// call initTrackers at bottom of file after other init code runs
 
 // Short Range Attacks
 function rollShortRangeFirstTurn() {
-const description = 'Short Range - First Turn<br>Faerie Fire (advantage) + Hunters Mark + Short Bow + Sharp Shoot';
-rollWeaponDice(['3d6', '1d8'], 12, description);
+const description = 'Short Range - First Turn<br>Faerie Fire (advantage) + Hunters Mark (1d6) + Shortbow + Dread Ambusher + 1d6 Magic + Sharpshooter';
+// Shortbow first turn: weapon 1d6 + Dread Ambusher 1d8 + Magic 1d6 + Hunter's Mark 1d6. Modifiers: DEX +4 + Sharpshooter +10 => +14
+// We include an explicit '1d6' for Hunter's Mark in the dice array for first-turn calculations.
+rollWeaponDice(['1d6', '1d8', '1d6', '1d6'], 14, description);
 }
 
 function rollShortRangeOtherTurns() {
-const description = 'Short Range - Other Turns<br>Short Bow + Normal Arrow + Hunters Mark';
-rollWeaponDice(['2d6'], 2, description);
+const description = 'Short Range - Other Turns<br>Shortbow + 1d6 Magic + 1d6 HM + DEX +4 + Sharpshooter +10';
+// Shortbow: weapon 1d6 + Magic 1d6 + Hunter's Mark 1d6. Modifiers: +4 Dex +10 Sharpshooter => +14
+rollWeaponDice(['1d6', '1d6', '1d6'], 14, description);
 }
 
 // Long Range Attacks
 function rollLongRangeFirstTurn() {
-const description = 'Long Range - First Turn<br>Faerie Fire (advantage) + Hunters Mark + Long Bow + Sharp Shoot';
-rollWeaponDice(['2d6', '2d8'], 13, description);
+const description = 'Long Range - First Turn<br>Faerie Fire (advantage) + Hunters Mark (1d6) + Longbow + Dread Ambusher + Sharpshooter';
+// Longbow first turn: weapon 1d8 + Dread Ambusher 1d8 + Hunter's Mark 1d6. Modifiers: DEX +4 + Sharpshooter +10 => +14
+rollWeaponDice(['1d8', '1d8', '1d6'], 14, description);
 }
 
 function rollLongRangeOtherTurns() {
-const description = 'Long Range - Other Turns<br>Long Bow + Normal Arrow + Hunters Mark + Sharp Shooter';
-rollWeaponDice(['2d6', '1d8'], 13, description);
+const description = 'Long Range - Other Turns<br>Longbow + 1d6 HM + DEX +4 + Sharpshooter +10';
+// Longbow: weapon 1d8 + Hunter's Mark 1d6. Modifiers: +4 Dex +10 Sharpshooter => +14
+rollWeaponDice(['1d8', '1d6'], 14, description);
 }
 
 // Magic Ring System
@@ -621,6 +912,95 @@ closeRingSelector();
 updateRingStatus();
 }
 
+// --- Magic Weapons System (select up to 3, similar to Magic Rings) ---
+const MAX_EQUIPPED_WEAPONS = 3;
+
+const magicWeapons = {
+    'dupo-quiver': {
+        name: 'Dupo Quiver',
+        description: "Knock on wood two times and your shot is doubled! You are able to hit up to 2 targets!",
+        special: 'dupo'
+    }
+};
+
+let equippedWeapons = [];
+
+function openMagicWeaponSelector() {
+    const modal = document.getElementById('weapon-selector-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeWeaponSelector() {
+    const modal = document.getElementById('weapon-selector-modal');
+    if (modal) modal.style.display = 'none';
+    const checkboxes = document.querySelectorAll('#weapon-list input[type="checkbox"]');
+    checkboxes.forEach(cb => cb.checked = false);
+}
+
+function confirmWeaponSelection() {
+    const checkboxes = document.querySelectorAll('#weapon-list input[type="checkbox"]:checked');
+    if (checkboxes.length > MAX_EQUIPPED_WEAPONS) {
+        const weaponOutput = document.getElementById('weapon-output');
+        if (weaponOutput) weaponOutput.innerHTML = `<div style="color: #f00;">You can only equip up to ${MAX_EQUIPPED_WEAPONS} magic weapons! </div>`;
+        return;
+    }
+
+    equippedWeapons = Array.from(checkboxes).map(cb => cb.value);
+    closeWeaponSelector();
+    updateWeaponStatus();
+}
+
+function updateWeaponStatus() {
+    const status = document.getElementById('weapon-status');
+    const equippedDiv = document.getElementById('equipped-weapons');
+    if (!status || !equippedDiv) return;
+    if (equippedWeapons.length === 0) {
+        status.style.display = 'none';
+        return;
+    }
+    status.style.display = 'block';
+    let html = '';
+    equippedWeapons.forEach(wid => {
+        const w = magicWeapons[wid];
+        if (!w) return;
+        html += `
+            <div style="margin: 10px 0; padding: 10px; background: #444; border-radius:6px; border-left:4px solid #0f0;">
+                <div style="font-weight:700;color:#0f0">${w.name}</div>
+                <div style="color:#ccc;margin-top:6px">${w.description}</div>
+                <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="weapon-btn" onclick="unequipWeapon('${wid}')" style="font-size:0.9em;padding:6px 10px;">Unequip</button>
+                </div>
+            </div>`;
+    });
+    equippedDiv.innerHTML = html;
+}
+
+function unequipWeapon(weaponId) {
+    equippedWeapons = equippedWeapons.filter(id => id !== weaponId);
+    updateWeaponStatus();
+    const weaponOutput = document.getElementById('weapon-output');
+    const w = magicWeapons[weaponId];
+    if (weaponOutput) weaponOutput.innerHTML = `<div style="color:#0f0;font-weight:700;">${w ? w.name : 'Weapon'} unequipped.</div>`;
+}
+
+// Dupo chooser state
+let _lastDupoA = null;
+let _lastDupoB = null;
+let _lastDupoDesc = null;
+
+function chooseDupoResult(which) {
+    const weaponOutput = document.getElementById('weapon-output');
+    if (!weaponOutput) return;
+    if (which === 'a' && _lastDupoA) {
+        weaponOutput.innerHTML = `<div style="margin-bottom:15px;color:#0f0;font-weight:bold;">${_lastDupoDesc} — Selected: Shot A</div>${_lastDupoA.html}`;
+        recordRoll({ total: _lastDupoA.total, title: `${_lastDupoDesc} (Shot A)`, breakdownHtml: _lastDupoA.html, isCritSuccess: false, isCritFail: false });
+    } else if (which === 'b' && _lastDupoB) {
+        weaponOutput.innerHTML = `<div style="margin-bottom:15px;color:#0f0;font-weight:bold;">${_lastDupoDesc} — Selected: Shot B</div>${_lastDupoB.html}`;
+        recordRoll({ total: _lastDupoB.total, title: `${_lastDupoDesc} (Shot B)`, breakdownHtml: _lastDupoB.html, isCritSuccess: false, isCritFail: false });
+    }
+    _lastDupoA = null; _lastDupoB = null; _lastDupoDesc = null;
+}
+
 function updateRingStatus() {
 const ringStatus = document.getElementById('ring-status');
 const equippedRingsDiv = document.getElementById('equipped-rings');
@@ -672,6 +1052,9 @@ const ring = magicRings[ringId];
 if (!ring) {
 return;
 }
+
+
+
 
 if (ring.currentUses <= 0) {
 const weaponOutput = document.getElementById('weapon-output');
@@ -899,9 +1282,9 @@ function saveHealth() {
 }
 
 function updateHealthUI() {
-    const el = document.getElementById('health-value');
+    const el = document.getElementById('health-display');
     if (!el) return;
-    el.textContent = `${currentHealth} HP`;
+    el.textContent = `${currentHealth} / ${maxHealth}`;
     // colorize based on thresholds
     if (currentHealth <= 0) el.style.color = '#f55';
     else if (currentHealth <= Math.floor(maxHealth * 0.3)) el.style.color = '#ffb86b';
@@ -933,6 +1316,9 @@ function initHealth() {
 
 // initialize health UI
 initHealth();
+
+// initialize trackers (initiative & currency)
+initTrackers();
 
 // Apply custom health using numeric input
 function applyCustomHealthAdd() {
@@ -1317,12 +1703,21 @@ const _pdfBlobUrls = [];
 
 function openPdfSelector() {
     const input = document.getElementById('pdf-input');
-    if (input) input.click();
+    if (!input) {
+        const weaponOutput = document.getElementById('weapon-output');
+        if (weaponOutput) weaponOutput.innerHTML = `<div style="color:#f88;">No PDF input available.</div>`;
+        return;
+    }
+    input.click();
 }
 
 function handlePdfFiles(event) {
-    const files = event.target.files || event;
+    const files = (event && event.target && event.target.files) ? event.target.files : event;
     const list = document.getElementById('pdf-list');
+    if (!list) {
+        console.warn('PDF list element not present');
+        return;
+    }
     list.innerHTML = '';
     if (!files || files.length === 0) {
         list.textContent = 'No PDFs selected.';
