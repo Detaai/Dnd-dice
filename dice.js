@@ -830,9 +830,25 @@ function toggleBumber() {
     if (!b) return;
     if (b.style.display === 'none') {
         b.style.display = 'flex';
+        // reschedule auto-hide when user shows it
+        scheduleBumberAutoHide(5000);
     } else {
         b.style.display = 'none';
+        // clear any pending auto-hide
+        if (window._bumberHideTimeout) { clearTimeout(window._bumberHideTimeout); window._bumberHideTimeout = null; }
     }
+}
+
+// Auto-hide the bumber after a delay (ms). Stores timeout on window to allow clearing.
+function scheduleBumberAutoHide(ms) {
+    const b = document.getElementById('bumber');
+    if (!b) return;
+    // clear existing
+    if (window._bumberHideTimeout) { clearTimeout(window._bumberHideTimeout); window._bumberHideTimeout = null; }
+    window._bumberHideTimeout = setTimeout(() => {
+        try { b.style.display = 'none'; } catch (e) { /* ignore */ }
+        window._bumberHideTimeout = null;
+    }, ms || 5000);
 }
 
 // Short Range Attacks
