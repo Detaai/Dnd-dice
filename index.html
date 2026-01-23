@@ -107,7 +107,7 @@
             <div class="card" id="initiative-card">
                 <h3>Initiative</h3>
                 <div class="card-actions">
-                    <button class="weapon-btn" onclick="rollInitiative()">Roll Initiative (1d20 + 2)</button>
+                    <button class="weapon-btn" onclick="rollInitiative()">Roll Initiative (1d20 + 6)</button>
                     <button class="weapon-btn" onclick="showPdf('Thaine-lv-5.pdf','Thaine-lv-5.pdf')" style="margin-left:10px;">Open Thaine-lv-5.pdf</button>
                 </div>
                     <div style="margin-top:12px; text-align:center;">
@@ -120,6 +120,43 @@
                         <button class="weapon-btn secondary-action" onclick="applyCustomHealthAdd()">Apply +</button>
                     </div>
                 </div>
+            </div>
+
+            <!-- Initiative Tracker -->
+            <div class="card" style="max-width:560px;">
+                <h3 style="color:var(--accent-2);">Initiative Tracker</h3>
+                <div style="display:flex;gap:8px;align-items:center;justify-content:center;margin-bottom:8px;">
+                    <input id="initiative-name" type="text" placeholder="Name (optional)" style="padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);width:60%;background:transparent;color:#fff;" />
+                    <button class="weapon-btn" onclick="addLastInitiative()">Add Last Roll</button>
+                </div>
+                <div style="text-align:center;margin-bottom:8px;">
+                    <button class="weapon-btn" onclick="sortInitiativeDesc()">Sort Desc</button>
+                    <button class="weapon-btn" onclick="clearInitiative()" style="margin-left:8px;">Clear</button>
+                </div>
+                <div id="initiative-list" style="max-height:180px;overflow:auto;text-align:left;color:#fff;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);"></div>
+            </div>
+
+            <!-- Currency Tracker -->
+            <div class="card" style="max-width:560px;">
+                <h3 style="color:var(--accent-2);">Currency</h3>
+                <div style="display:flex;gap:8px;justify-content:center;align-items:center;margin-bottom:10px;">
+                    <div style="text-align:center;">
+                        <div style="color:var(--muted);font-size:0.85rem;margin-bottom:6px;">Gold</div>
+                        <div id="currency-gp" style="font-weight:700;font-size:1.2rem;color:#ffd54a;">0</div>
+                        <div style="margin-top:6px;"><button class="weapon-btn" onclick="changeCurrency('gp',1)">+1</button><button class="weapon-btn" onclick="changeCurrency('gp',-1)" style="margin-left:6px;">-1</button></div>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="color:var(--muted);font-size:0.85rem;margin-bottom:6px;">Silver</div>
+                        <div id="currency-sp" style="font-weight:700;font-size:1.2rem;color:#c0c0ff;">0</div>
+                        <div style="margin-top:6px;"><button class="weapon-btn" onclick="changeCurrency('sp',1)">+1</button><button class="weapon-btn" onclick="changeCurrency('sp',-1)" style="margin-left:6px;">-1</button></div>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="color:var(--muted);font-size:0.85rem;margin-bottom:6px;">Copper</div>
+                        <div id="currency-cp" style="font-weight:700;font-size:1.2rem;color:#b87333;">0</div>
+                        <div style="margin-top:6px;"><button class="weapon-btn" onclick="changeCurrency('cp',1)">+1</button><button class="weapon-btn" onclick="changeCurrency('cp',-1)" style="margin-left:6px;">-1</button></div>
+                    </div>
+                </div>
+                <div style="text-align:center;color:var(--muted);">Values persist in localStorage.</div>
             </div>
 
             <!-- Magic Card (Primary actions) -->
@@ -184,21 +221,52 @@
             <!-- Weapons Card (Secondary actions) -->
             <div class="card" id="weapons-card">
                 <h3>Weapons</h3>
-                <div class="card-actions">
-                    <button class="weapon-btn secondary-action" onclick="openMagicWeaponsModal()">Magic Weapons</button>
+                <div class="card-actions" style="margin-top:8px;">
+                    <button class="weapon-btn secondary-action" onclick="openMagicWeaponSelector()">Magic Weapons</button>
+                </div>
+                <div id="weapon-status" style="display: none; margin-top: 12px; padding: 12px; background: #333; border-radius: 8px; border: 2px solid #666; color:#fff;">
+                    <h4 style="color:#0f0;margin:0 0 8px 0;">Equipped Magic Weapons</h4>
+                    <div id="equipped-weapons" style="text-align: left; color: #fff;"></div>
                 </div>
                 <div class="card-subsection">
                     <h4 style="margin:0 0 8px 0; color:#dfe6e9;">Short Range</h4>
                     <div class="card-actions">
-                        <button class="weapon-btn secondary-action" data-attack="true" onclick="rollShortRangeFirstTurn()">First Turn (3d6 + 1d8 + DC 12 Wis)</button>
-                        <button class="weapon-btn secondary-action" data-attack="true" onclick="rollShortRangeOtherTurns()">Other Turns (2d6 + 2 + DC 12 Wis)</button>
+                        <!--first turn:
+                        Shortbow: 1d6
+                        Dread Ambusher bonus: 1d8
+                        Magic Shortbow: 1d6
+                        Hunter’s Mark: 1d6
+                        short bow: 1d6
+                        DEX: +4
+                        Sharpshooter: +10
+                        Other turns:
+                        Weapon Damage: 1d6
+                        Magic Shortbow: 1d6
+                        Hunter's Mark: 1d6
+                        DEX Modifier: +4
+                        Sharpshooter: +10
+                        -->
+                        <button class="weapon-btn secondary-action" data-attack="true" onclick="rollShortRangeFirstTurn()">First Turn (Shortbow: 1d6 + 1d8 Dread Ambusher +1d6 HM +1d6 Magic +4 Dex +10 Sharpshooter)</button>
+                        <button class="weapon-btn secondary-action" data-attack="true" onclick="rollShortRangeOtherTurns()">Other Turns (Shortbow: 1d6 + 1d6 Magic + 1d6 HM +4 Dex +10 Sharpshooter + DC 12 Wis)</button>
                     </div>
                 </div>
                 <div class="card-subsection" style="margin-top:12px;">
                     <h4 style="margin:0 0 8px 0; color:#dfe6e9;">Long Range</h4>
                     <div class="card-actions">
-                        <button class="weapon-btn secondary-action" data-attack="true" onclick="rollLongRangeFirstTurn()">First Turn (2d6 + 2d8 + 10)</button>
-                        <button class="weapon-btn secondary-action" data-attack="true" onclick="rollLongRangeOtherTurns()">Other Turns (2d6 + 1d8 + 10)</button>
+                        <!-- first turn:
+                        Longbow: 1d8
+                        Dread Ambusher bonus: 1d8
+                        Hunter’s Mark: 1d6
+                        DEX: +4
+                        Sharpshooter: +10 
+                        Other turns: 
+                        Weapon Damage: 1d8
+                        Hunter's Mark: 1d6
+                        DEX Modifier: +4
+                        Sharpshooter: +10
+                        -->
+                        <button class="weapon-btn secondary-action" data-attack="true" onclick="rollLongRangeFirstTurn()">First Turn (Longbow: 1d8 + 1d8 Dread Ambusher +1d6 HM +4 Dex +10 Sharpshooter)</button>
+                        <button class="weapon-btn secondary-action" data-attack="true" onclick="rollLongRangeOtherTurns()">Other Turns (Longbow: 1d8 + 1d6 HM +4 Dex +10 Sharpshooter)</button>
                     </div>
                 </div>
             </div>
@@ -243,21 +311,42 @@
             </div>
 
         </div>
-
-        <!-- Magic Weapons Selection Modal -->
-        <div id="weapons-selector-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;">
-            <div style="background: #333; padding: 30px; border-radius: 10px; border: 2px solid #888; max-width: 500px; width: 90%;">
-                <h3 style="margin-top: 0; color: #0f0;">Select Magic Weapons (Max 3)</h3>
-                <div id="weapons-slot-counter" style="margin: 10px 0; color: #fff; font-weight: bold;"></div>
-                <div id="weapons-list" style="margin: 20px 0; text-align: left;"></div>
-                <div style="margin-top: 20px; text-align: center;">
-                    <button class="weapon-btn" onclick="confirmMagicWeaponSelection()" style="margin: 5px;">Confirm</button>
-                    <button class="weapon-btn" onclick="closeMagicWeaponsModal()" style="margin: 5px;">Cancel</button>
-                </div>
-            </div>
-        </div>
     </div>
-    
+
+        <!-- Magic Weapon Selection Modal -->
+
+        <div id="weapon-selector-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;">
+
+            <div style="background: #333; padding: 30px; border-radius: 10px; border: 2px solid #888; max-width: 600px; width: 90%;">
+
+                <h3 style="margin-top: 0; color: #0f0;">Select Magic Weapons (Max 3)</h3>
+
+                <div id="weapon-list" style="margin: 20px 0; text-align: left; max-height: 300px; overflow:auto;">
+
+                    <label style="display: block; margin: 10px 0; padding: 10px; background: #444; border-radius: 5px; cursor: pointer;">
+
+                        <input type="checkbox" value="dupo-quiver" style="margin-right: 10px;">
+
+                        <span style="color: #fff; font-weight: bold;">Dupo Quiver</span>
+
+                        <div style="color: #aaa; font-size: 0.9em; margin-top: 5px; margin-left: 25px;">Knock on wood two times and your shot is doubled! You are able to hit up to 2 targets!</div>
+
+                    </label>
+
+                </div>
+
+                <div style="margin-top: 20px; text-align: center;">
+
+                    <button class="weapon-btn" onclick="confirmWeaponSelection()" style="margin: 5px;">Continue</button>
+
+                    <button class="weapon-btn" onclick="closeWeaponSelector()" style="margin: 5px;">Cancel</button>
+
+                </div>
+
+            </div>
+
+        </div>
+
     <div id="pdf-viewer-modal" style="display:none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; justify-content: center; align-items: center;">
         <div style="width: 90%; height: 90%; background: #111; border-radius: 8px; padding: 12px; box-sizing: border-box; position: relative;">
             <button class="weapon-btn" onclick="closePdfViewer()" style="position: absolute; top: 12px; right: 12px;">Close</button>
@@ -268,5 +357,3 @@
     <script src="dice.js"></script>
 </body>
 </html>
-
-
