@@ -1922,6 +1922,6 @@ function showPdf(url, name) {
 function closePdfViewer() {
     const modal = document.getElementById('pdf-viewer-modal');
     const frame = document.getElementById('pdf-frame');
-    if (frame) frame.src = '';
+    if (frame) frame.src = ''; 
     if (modal) modal.style.display = 'none';
 }
