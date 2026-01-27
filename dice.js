@@ -413,38 +413,18 @@ weaponOutput.innerHTML = '<div style="color: #fff;">Rolling...</div>';
     const rollId = generateRollId();
     lastRollId = rollId;
 
-// Auto-apply a magic ring bonus (if any equipped and has uses remaining)
-let ringBonusTotal = 0;
+// Check for an available magic ring to apply later (Echo Band will use attack totals to compute its echo)
 let ringUsedId = null;
 const nextRingId = getNextAvailableRing();
-let ringRollDetails = null;
 if (nextRingId) {
-    const ring = magicRings[nextRingId];
-    const diceMatch = ring.damage.match(/^(\d+)d(\d+)$/);
-    if (diceMatch) {
-        const count = parseInt(diceMatch[1]);
-        const sides = parseInt(diceMatch[2]);
-        let ringTotal = 0;
-        let ringRolls = [];
-        for (let i = 0; i < count; i++) {
-            const r = rollDamageDie(sides);
-            ringRolls.push(r);
-            ringTotal += r;
-        }
-        const finalDamage = Math.max(1, Math.floor(ringTotal * ring.damageModifier));
-        // consume a use
-        ring.currentUses = Math.max(0, ring.currentUses - 1);
-        ringBonusTotal = finalDamage;
-        ringUsedId = nextRingId;
-        ringRollDetails = { id: nextRingId, name: ring.name, rolls: ringRolls, total: ringTotal, final: finalDamage };
-    }
+    ringUsedId = nextRingId;
 }
 
 // Special handling: Dupo Quiver (double shot) if equipped
 if (Array.isArray(equippedWeapons) && equippedWeapons.indexOf('dupo-quiver') !== -1) {
-    // First shot (includes ring bonus if any)
+    // First shot
     const rollAId = rollId;
-    let totalA = modifier + ringBonusTotal;
+    let totalA = modifier;
     const rollsA = [];
     dice.forEach(diceStr => {
         const [count, sides] = diceStr.split('d').map(n => parseInt(n));
@@ -481,7 +461,7 @@ if (Array.isArray(equippedWeapons) && equippedWeapons.indexOf('dupo-quiver') !==
         console.error('Dupo A apply error', e);
     }
 
-    // Second shot (no ring bonus) as independent roll
+    // Second shot (independent roll)
     const rollBId = generateRollId();
     let totalB = modifier;
     const rollsB = [];
@@ -520,15 +500,45 @@ if (Array.isArray(equippedWeapons) && equippedWeapons.indexOf('dupo-quiver') !==
         console.error('Dupo B apply error', e);
     }
 
+    // If Echo Band is equipped, compute echoes per shot and consume one use per attack used
+    if (ringUsedId) {
+        const ring = magicRings[ringUsedId];
+        try {
+            // Shot A
+            if (ring.currentUses && ring.currentUses > 0) {
+                const echoA = Math.max(1, Math.floor(totalA * (ring.damageModifier || 0.5)));
+                totalA += echoA;
+                hunterAHtml += `<div style="color:#fff; margin:6px 0;">${ring.name} Echo: +${echoA} (half of shot)</div>`;
+                ring.currentUses = Math.max(0, ring.currentUses - 1);
+            } else {
+                hunterAHtml += `<div style="color:#777; margin:6px 0;">${ring.name} Echo: (no uses remaining)</div>`;
+            }
+            // Shot B
+            if (ring.currentUses && ring.currentUses > 0) {
+                const echoB = Math.max(1, Math.floor(totalB * (ring.damageModifier || 0.5)));
+                totalB += echoB;
+                hunterBHtml += `<div style="color:#fff; margin:6px 0;">${ring.name} Echo: +${echoB} (half of shot)</div>`;
+                ring.currentUses = Math.max(0, ring.currentUses - 1);
+            } else {
+                hunterBHtml += `<div style="color:#777; margin:6px 0;">${ring.name} Echo: (no uses remaining)</div>`;
+            }
+            updateRingStatus();
+        } catch (e) {
+            console.error('Error applying echo band to Dupo shots', e);
+        }
+    }
+
     // Build display HTML for both shots and provide selection buttons
     let aHtml = `<div style="color:#fff; margin:5px 0; font-weight:700">Shot A</div>`;
     rollsA.forEach(r => { aHtml += `<div style="color:#fff;margin:4px 0;">${r.dice}: [${r.rolls.join(', ')}]</div>`; });
     aHtml += hunterAHtml;
+    aHtml += `<div style="color:#fff;margin-top:8px;">Modifiers: <span style="color:#ffd">Dex +4</span>, <span style="color:#ffd">Sharpshooter +10</span></div>`;
     aHtml += `<div style="margin-top:8px;color:#ff0;font-weight:700;">Total A: ${totalA}</div>`;
 
     let bHtml = `<div style="color:#fff; margin:5px 0; font-weight:700">Shot B</div>`;
     rollsB.forEach(r => { bHtml += `<div style="color:#fff;margin:4px 0;">${r.dice}: [${r.rolls.join(', ')}]</div>`; });
     bHtml += hunterBHtml;
+    bHtml += `<div style="color:#fff;margin-top:8px;">Modifiers: <span style="color:#ffd">Dex +4</span>, <span style="color:#ffd">Sharpshooter +10</span></div>`;
     bHtml += `<div style="margin-top:8px;color:#ff0;font-weight:700;">Total B: ${totalB}</div>`;
 
     // store for chooser
@@ -541,20 +551,17 @@ if (Array.isArray(equippedWeapons) && equippedWeapons.indexOf('dupo-quiver') !==
     combined += `<div style="flex:1;min-width:220px;background:#222;padding:10px;border-radius:6px;">${aHtml}<div style="text-align:center;margin-top:10px;"><button class=\"weapon-btn\" onclick=\"chooseDupoResult('a')\">Choose Shot A</button></div></div>`;
     combined += `<div style="flex:1;min-width:220px;background:#222;padding:10px;border-radius:6px;">${bHtml}<div style="text-align:center;margin-top:10px;"><button class=\"weapon-btn\" onclick=\"chooseDupoResult('b')\">Choose Shot B</button></div></div>`;
     combined += `</div>`;
+    combined += `<div style="text-align:center;margin-top:12px;"><button class=\"weapon-btn\" onclick=\"chooseDupoResult('combine')\">Combine Shots (A + B)</button></div>`;
 
-    // show ring details if used
-    if (ringUsedId && ringRollDetails) {
-        combined += `<div style="color:#fff;margin-top:10px;">Ring Bonus - ${ringRollDetails.name}: [${ringRollDetails.rolls.join(', ')}] = ${ringRollDetails.total} → ${ringRollDetails.final}</div>`;
-        updateRingStatus();
-    }
+    // ring echo details are included per-shot above and ring uses updated there
 
     const wo = document.getElementById('weapon-output');
     if (wo) wo.innerHTML = combined;
     return;
 }
 
-// Parse dice notation (e.g., "3d6", "1d8") and include ring bonus in the total
-let total = modifier + ringBonusTotal;
+// Parse dice notation (e.g., "3d6", "1d8")
+let total = modifier;
 let rolls = [];
 
 dice.forEach(diceStr => {
@@ -574,6 +581,8 @@ let resultHTML = `<div style="margin-bottom: 15px; color: #0f0; font-weight: bol
 rolls.forEach(r => {
 resultHTML += `<div style="color: #fff; margin: 5px 0;">${r.dice}:  [${r.rolls.join(', ')}]</div>`;
 });
+    // Show modifiers in visual breakdown (Dex +4, Sharpshooter +10)
+    resultHTML += `<div style="color:#fff;margin-top:8px;">Modifiers: <span style="color:#ffd">Dex +4</span>, <span style="color:#ffd">Sharpshooter +10</span></div>`;
 
 // Apply active-effect bonus dice (e.g., Hunter's Mark, Zephyr Strike)
 let hunterDetailsHTML = '';
@@ -657,23 +666,28 @@ if (skippedEffectsHTML) resultHTML += `<div style="margin-top:8px;color:#f88;fon
 
 resultHTML += `<div style="margin-top: 15px; color:  #ff0; font-size: 1.3em; font-weight: bold;">Total Damage: ${total}</div>`;
 
-// If a ring bonus was applied, show its details and update ring UI
-if (ringUsedId && ringRollDetails) {
-    resultHTML = `<div style="margin-bottom: 15px; color: #0f0; font-weight: bold;">${description}</div>`;
-    rolls.forEach(r => {
-        resultHTML += `<div style="color: #fff; margin: 5px 0;">${r.dice}:  [${r.rolls.join(', ')}]</div>`;
-    });
-    resultHTML += `<div style="color: #fff; margin: 10px 0;">Ring Bonus - ${ringRollDetails.name}: [${ringRollDetails.rolls.join(', ')}] = ${ringRollDetails.total} → ${ringRollDetails.final}</div>`;
-    resultHTML += hunterDetailsHTML;
-    resultHTML += `<div style="margin-top: 15px; color:  #ff0; font-size: 1.3em; font-weight: bold;">Total Damage: ${total}</div>`;
-    weaponOutput.innerHTML = resultHTML;
-    updateRingStatus();
-    // Record the roll with its unique id for tracking
-    recordRoll({ total, title: description, breakdownHtml: resultHTML, isCritSuccess: false, isCritFail: false, rollId });
-} else {
-    weaponOutput.innerHTML = resultHTML;
-    recordRoll({ total, title: description, breakdownHtml: resultHTML, isCritSuccess: false, isCritFail: false, rollId });
+// If Echo Band is equipped we compute its echo from the final total and include it
+if (ringUsedId) {
+    const ring = magicRings[ringUsedId];
+    try {
+        const echo = Math.max(1, Math.floor(total * (ring.damageModifier || 0.5)));
+        // show echo detail
+        resultHTML += `<div style="color:#fff; margin-top:8px;">${ring.name} Echo: +${echo} (half of attack)</div>`;
+        total += echo;
+        // consume one use
+        ring.currentUses = Math.max(0, (ring.currentUses || 0) - 1);
+        updateRingStatus();
+    } catch (e) {
+        console.error('Error applying echo band', e);
+    }
 }
+
+weaponOutput.innerHTML = resultHTML;
+recordRoll({ total, title: description, breakdownHtml: resultHTML, isCritSuccess: false, isCritFail: false, rollId });
+// Refresh active effects UI and spell buttons so applied effects are visible
+updateActiveEffectsUI();
+updateSpellButtons();
+updateAttackHighlights();
 }
 
 // Initiative
@@ -684,7 +698,7 @@ const total = roll + 6;
 weaponOutput.innerHTML = `
        <div style="margin-bottom: 15px; color: #0f0; font-weight: bold;">Initiative Roll</div>
        <div style="color: #fff; margin: 5px 0;">1d20: [${roll}]</div>
-       <div style="color: #fff; margin:  5px 0;">Modifier: +2</div>
+    <div style="color: #fff; margin:  5px 0;">Modifier: +6</div>
        <div style="margin-top: 15px; color: #ff0; font-size: 1.3em; font-weight: bold;">Initiative: ${total}</div>
    `;
     // record initiative in history and flag crits
@@ -770,7 +784,7 @@ const _oldRollInitiative = rollInitiative;
 function rollInitiative() {
     const weaponOutput = document.getElementById('weapon-output');
     const roll = rollDie(20);
-    const total = roll + 2;
+    const total = roll + 6;
     lastInitiativeValue = total;
     if (weaponOutput) {
         weaponOutput.innerHTML = `\n       <div style="margin-bottom: 15px; color: #0f0; font-weight: bold;">Initiative Roll</div>\n       <div style="color: #fff; margin: 5px 0;">1d20: [${roll}]</div>\n       <div style="color: #fff; margin:  5px 0;">Modifier: +6</div>\n       <div style="margin-top: 15px; color: #ff0; font-size: 1.3em; font-weight: bold;">Initiative: ${total}</div>\n    `;
@@ -856,26 +870,91 @@ function rollShortRangeFirstTurn() {
 const description = 'Short Range - First Turn<br>Faerie Fire (advantage) + Hunters Mark (1d6) + Shortbow + Dread Ambusher + 1d6 Magic + Sharpshooter';
 // Shortbow first turn: weapon 1d6 + Dread Ambusher 1d8 + Magic 1d6 + Hunter's Mark 1d6. Modifiers: DEX +4 + Sharpshooter +10 => +14
 // We include an explicit '1d6' for Hunter's Mark in the dice array for first-turn calculations.
-rollWeaponDice(['1d6', '1d8', '1d6', '1d6'], 14, description);
+// Ensure Faerie Fire + Hunter's Mark are applied and spell slots consumed for first turn
+applyFirstTurnBuffs();
+// Remove the explicit Hunter's Mark die here; the effect will add its bonus via activeEffects
+rollWeaponDice(['1d6', '1d8', '1d6'], 14, description);
 }
 
 function rollShortRangeOtherTurns() {
 const description = 'Short Range - Other Turns<br>Shortbow + 1d6 Magic + 1d6 HM + DEX +4 + Sharpshooter +10';
 // Shortbow: weapon 1d6 + Magic 1d6 + Hunter's Mark 1d6. Modifiers: +4 Dex +10 Sharpshooter => +14
-rollWeaponDice(['1d6', '1d6', '1d6'], 14, description);
+// Remove explicit Hunter's Mark die here; Hunter's Mark will be applied via activeEffects when active
+rollWeaponDice(['1d6', '1d6'], 14, description);
 }
 
 // Long Range Attacks
 function rollLongRangeFirstTurn() {
 const description = 'Long Range - First Turn<br>Faerie Fire (advantage) + Hunters Mark (1d6) + Longbow + Dread Ambusher + Sharpshooter';
 // Longbow first turn: weapon 1d8 + Dread Ambusher 1d8 + Hunter's Mark 1d6. Modifiers: DEX +4 + Sharpshooter +10 => +14
-rollWeaponDice(['1d8', '1d8', '1d6'], 14, description);
+// Ensure Faerie Fire + Hunter's Mark are applied and spell slots consumed for first turn
+applyFirstTurnBuffs();
+// Remove the explicit Hunter's Mark die here; the effect will add its bonus via activeEffects
+rollWeaponDice(['1d8', '1d8'], 14, description);
 }
 
 function rollLongRangeOtherTurns() {
 const description = 'Long Range - Other Turns<br>Longbow + 1d6 HM + DEX +4 + Sharpshooter +10';
 // Longbow: weapon 1d8 + Hunter's Mark 1d6. Modifiers: +4 Dex +10 Sharpshooter => +14
-rollWeaponDice(['1d8', '1d6'], 14, description);
+// Remove explicit Hunter's Mark die here; Hunter's Mark will be applied via activeEffects when active
+rollWeaponDice(['1d8'], 14, description);
+}
+
+// Apply Faerie Fire and Hunter's Mark for first turn automatically (consumes slots if not already active)
+function applyFirstTurnBuffs() {
+    const out = document.getElementById('magic-output') || document.getElementById('weapon-output');
+    let messages = [];
+
+    // Faerie Fire
+    const hasFaerie = activeEffects.some(e => e.name && e.name.toLowerCase() === 'faerie fire' && e.state === 'active');
+    if (!hasFaerie) {
+        // attempt to consume a slot
+        if (consumeSpellSlot('Faerie Fire')) {
+            const effect = {
+                name: 'Faerie Fire',
+                dc: 13,
+                desc: 'Affected creatures are outlined in light: attacks against them have advantage.',
+                clearOnLongRest: true,
+                allowStack: false,
+                state: 'active',
+                appliedRolls: []
+            };
+            addActiveEffect(effect);
+            messages.push(`Faerie Fire applied (DC ${effect.dc}).`);
+        } else {
+            messages.push('Faerie Fire could not be applied (no spell slots).');
+        }
+    } else {
+        messages.push('Faerie Fire already active.');
+    }
+
+    // Hunter's Mark
+    const hasHunter = activeEffects.some(e => e.name && e.name.toLowerCase() === "hunter's mark" && e.state === 'active');
+    if (!hasHunter) {
+        if (consumeSpellSlot("Hunter's Mark")) {
+            const effect = {
+                name: "Hunter's Mark",
+                bonusDice: '1d6',
+                desc: "Marked target takes +1d6 damage from your attacks.",
+                clearOnLongRest: false,
+                state: 'active',
+                appliedRolls: []
+            };
+            addActiveEffect(effect);
+            messages.push("Hunter's Mark applied (1d6)." );
+        } else {
+            messages.push("Hunter's Mark could not be applied (no spell slots).");
+        }
+    } else {
+        messages.push("Hunter's Mark already active.");
+    }
+
+    // Update UI and show remaining slots
+    updateSpellSlotsUI();
+    updateActiveEffectsUI();
+    if (out) {
+        out.innerHTML = `<div style="font-weight:700;color:#ffd">First-turn buffs</div><div style="color:#e8e8e8;margin-top:6px;">${messages.join(' ')}</div><div style="margin-top:8px;color:#ff6;">Spell slots remaining: ${spellSlotsRemaining}/${SPELL_SLOTS_TOTAL}</div>`;
+    }
 }
 
 // Magic Ring System
@@ -1021,9 +1100,32 @@ function chooseDupoResult(which) {
     if (which === 'a' && _lastDupoA) {
         weaponOutput.innerHTML = `<div style="margin-bottom:15px;color:#0f0;font-weight:bold;">${_lastDupoDesc} — Selected: Shot A</div>${_lastDupoA.html}`;
         recordRoll({ total: _lastDupoA.total, title: `${_lastDupoDesc} (Shot A)`, breakdownHtml: _lastDupoA.html, isCritSuccess: false, isCritFail: false });
+        updateActiveEffectsUI();
+        updateSpellButtons();
+        updateAttackHighlights();
     } else if (which === 'b' && _lastDupoB) {
         weaponOutput.innerHTML = `<div style="margin-bottom:15px;color:#0f0;font-weight:bold;">${_lastDupoDesc} — Selected: Shot B</div>${_lastDupoB.html}`;
         recordRoll({ total: _lastDupoB.total, title: `${_lastDupoDesc} (Shot B)`, breakdownHtml: _lastDupoB.html, isCritSuccess: false, isCritFail: false });
+        updateActiveEffectsUI();
+        updateSpellButtons();
+        updateAttackHighlights();
+    }
+    else if (which === 'combine' && _lastDupoA && _lastDupoB) {
+        const combinedTotal = (_lastDupoA.total || 0) + (_lastDupoB.total || 0);
+        const combinedHtml = `<div style="margin-bottom:15px;color:#0f0;font-weight:bold;">${_lastDupoDesc} — Combined Shots (A + B)</div>` +
+            `<div style="display:flex;gap:20px;flex-wrap:wrap;">` +
+            `<div style="flex:1;min-width:220px;background:#222;padding:10px;border-radius:6px;">${_lastDupoA.html}</div>` +
+            `<div style="flex:1;min-width:220px;background:#222;padding:10px;border-radius:6px;">${_lastDupoB.html}</div>` +
+            `</div>` +
+            `<div style="margin-top:12px;color:#ff0;font-weight:800;font-size:1.1em;">Combined Total: ${combinedTotal}</div>`;
+
+        weaponOutput.innerHTML = combinedHtml;
+        recordRoll({ total: combinedTotal, title: `${_lastDupoDesc} (Combined Shots)`, breakdownHtml: combinedHtml, isCritSuccess: false, isCritFail: false });
+        updateActiveEffectsUI();
+        updateSpellButtons();
+        updateAttackHighlights();
+        _lastDupoA = null; _lastDupoB = null; _lastDupoDesc = null;
+        return;
     }
     _lastDupoA = null; _lastDupoB = null; _lastDupoDesc = null;
 }
@@ -1050,7 +1152,7 @@ if (ring) {
                    <div style="color:  #ff6; font-weight: bold;">Uses Remaining: ${ring.currentUses}/${ring.maxUses}</div>
                    <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
                        <button class="weapon-btn" onclick="useRing('${ringId}')" style="font-size: 0.9em; padding: 8px 15px;" ${ring.currentUses <= 0 ? 'disabled' : ''}>
-                           Use Ring Bonus (${ring.damage} ÷ 2)
+                           ${ringId === 'echo-band' ? 'Use Echo (attack total ÷ 2)' : `Use Ring Bonus (${ring.damage} ÷ 2)`}
                        </button>
                        <button class="weapon-btn" onclick="unequipRing('${ringId}')" style="font-size: 0.9em; padding: 8px 15px; background: linear-gradient(145deg, #663, #885); border-color: #aa6;">
                            Unequip
@@ -1654,7 +1756,7 @@ function castFaerieFire() {
     recordRoll({ total: 0, title: `Faerie Fire (DC ${dc})`, breakdownHtml: `<div style="color:#fff">Faerie Fire cast — Save DC ${dc}. No damage. Targets illuminated: advantage on attacks.</div>`, isCritSuccess: false, isCritFail: false });
 
     const out = document.getElementById('magic-output') || document.getElementById('weapon-output');
-    if (out) out.innerHTML = `<div style="font-weight:700;color:#ffd">Faerie Fire cast (DC ${dc})</div><div style="color:#e8e8e8;margin-top:6px;">Added Active Effect: advantage on attacks vs illuminated targets. Remove when effect ends or via the Active Effects list.</div>`;
+    if (out) out.innerHTML = `<div style="font-weight:700;color:#ffd">Faerie Fire cast (DC ${dc})</div><div style="color:#e8e8e8;margin-top:6px;">Added Active Effect: advantage on attacks vs illuminated targets. Remove when effect ends or via the Active Effects list.</div><div style="margin-top:8px;color:#ff6;">Spell slots remaining: ${spellSlotsRemaining}/${SPELL_SLOTS_TOTAL}</div>`;
 }
 
 function castHuntersMark() {
@@ -1687,7 +1789,7 @@ function castHuntersMark() {
     recordRoll({ total: 0, title: "Hunter's Mark (active)", breakdownHtml: `<div style="color:#fff">Hunter's Mark activated — bonus: ${effect.bonusDice}</div>`, isCritSuccess: false, isCritFail: false });
 
     const out = document.getElementById('magic-output') || document.getElementById('weapon-output');
-    if (out) out.innerHTML = `<div style="font-weight:700;color:#ffd">Hunter's Mark activated</div><div style="color:#e8e8e8;margin-top:6px;">Bonus damage ${effect.bonusDice} will be applied automatically to weapon attacks until removed.</div>`;
+    if (out) out.innerHTML = `<div style="font-weight:700;color:#ffd">Hunter's Mark activated</div><div style="color:#e8e8e8;margin-top:6px;">Bonus damage ${effect.bonusDice} will be applied automatically to weapon attacks until removed.</div><div style="margin-top:8px;color:#ff6;">Spell slots remaining: ${spellSlotsRemaining}/${SPELL_SLOTS_TOTAL}</div>`;
 }
 
 function updateAttackHighlights() {
