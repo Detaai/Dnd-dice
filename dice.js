@@ -169,6 +169,8 @@ function animateRoll(sides, callback) {
 
 // Loaded mode toggle
 let loaded = false;
+// Critical next-attack toggle
+let critNext = false;
 
 function getDiceShape(sides) {
 // SVG or Unicode for each die type
@@ -422,6 +424,11 @@ if (nextRingId) {
 
 // Special handling: Dupo Quiver (double shot) if equipped
 if (Array.isArray(equippedWeapons) && equippedWeapons.indexOf('dupo-quiver') !== -1) {
+    // If user had a global crit toggle set, clear it and let the Dupo chooser handle per-shot crit selection
+    if (critNext) {
+        critNext = false;
+        try { updateCritButtonUI(); } catch (e) { /* noop */ }
+    }
     // First shot
     const rollAId = rollId;
     let totalA = modifier;
@@ -548,10 +555,21 @@ if (Array.isArray(equippedWeapons) && equippedWeapons.indexOf('dupo-quiver') !==
 
     let combined = `<div style="margin-bottom:15px;color:#0f0;font-weight:bold;">${description} — Dupo Quiver (two shots)</div>`;
     combined += `<div style="display:flex;gap:20px;flex-wrap:wrap;">`;
-    combined += `<div style="flex:1;min-width:220px;background:#222;padding:10px;border-radius:6px;">${aHtml}<div style="text-align:center;margin-top:10px;"><button class=\"weapon-btn\" onclick=\"chooseDupoResult('a')\">Choose Shot A</button></div></div>`;
-    combined += `<div style="flex:1;min-width:220px;background:#222;padding:10px;border-radius:6px;">${bHtml}<div style="text-align:center;margin-top:10px;"><button class=\"weapon-btn\" onclick=\"chooseDupoResult('b')\">Choose Shot B</button></div></div>`;
+    combined += `<div style="flex:1;min-width:220px;background:#222;padding:10px;border-radius:6px;">${aHtml}<div style="text-align:center;margin-top:10px;">` +
+                `<button class=\"weapon-btn\" onclick=\"chooseDupoResult('a')\">Choose Shot A</button>` +
+                `<button class=\"weapon-btn\" style=\"margin-left:8px;\" onclick=\"chooseDupoResult('a-crit')\">Choose Shot A (Crit)</button>` +
+                `</div></div>`;
+    combined += `<div style="flex:1;min-width:220px;background:#222;padding:10px;border-radius:6px;">${bHtml}<div style="text-align:center;margin-top:10px;">` +
+                `<button class=\"weapon-btn\" onclick=\"chooseDupoResult('b')\">Choose Shot B</button>` +
+                `<button class=\"weapon-btn\" style=\"margin-left:8px;\" onclick=\"chooseDupoResult('b-crit')\">Choose Shot B (Crit)</button>` +
+                `</div></div>`;
     combined += `</div>`;
-    combined += `<div style="text-align:center;margin-top:12px;"><button class=\"weapon-btn\" onclick=\"chooseDupoResult('combine')\">Combine Shots (A + B)</button></div>`;
+    combined += `<div style="text-align:center;margin-top:12px;">` +
+                `<button class=\"weapon-btn\" onclick=\"chooseDupoResult('combine')\">Combine Shots (A + B)</button>` +
+                `<button class=\"weapon-btn\" style=\"margin-left:8px;\" onclick=\"chooseDupoResult('combine-crit-a')\">Combine (Crit A)</button>` +
+                `<button class=\"weapon-btn\" style=\"margin-left:8px;\" onclick=\"chooseDupoResult('combine-crit-b')\">Combine (Crit B)</button>` +
+                `<button class=\"weapon-btn\" style=\"margin-left:8px;\" onclick=\"chooseDupoResult('combine-crit-both')\">Combine (Crit Both)</button>` +
+                `</div>`;
 
     // ring echo details are included per-shot above and ring uses updated there
 
@@ -664,7 +682,7 @@ if (removedAny) {
 resultHTML += hunterDetailsHTML;
 if (skippedEffectsHTML) resultHTML += `<div style="margin-top:8px;color:#f88;font-size:0.95em;">Effects skipped:<div style="margin-top:6px;">${skippedEffectsHTML}</div></div>`;
 
-resultHTML += `<div style="margin-top: 15px; color:  #ff0; font-size: 1.3em; font-weight: bold;">Total Damage: ${total}</div>`;
+// (Total Damage display moved below to account for echoes & criticals)
 
 // If Echo Band is equipped we compute its echo from the final total and include it
 if (ringUsedId) {
@@ -681,8 +699,23 @@ if (ringUsedId) {
         console.error('Error applying echo band', e);
     }
 }
+    // Apply critical for non-Dupo single attacks
+    try {
+        if (critNext) {
+            total = total * 2;
+            resultHTML += `<div style="margin-top:8px;color:#f88;font-weight:800;">Critical Hit! Damage doubled.</div>`;
+            critNext = false;
+            // update UI toggle
+            try { updateCritButtonUI(); } catch (e) { /* ignore */ }
+        }
+    } catch (e) {
+        console.error('Error applying critical modifier:', e);
+    }
 
-weaponOutput.innerHTML = resultHTML;
+    // Final total display (after echoes & crits)
+    resultHTML += `<div style="margin-top: 15px; color:  #ff0; font-size: 1.3em; font-weight: bold;">Total Damage: ${total}</div>`;
+
+    weaponOutput.innerHTML = resultHTML;
 recordRoll({ total, title: description, breakdownHtml: resultHTML, isCritSuccess: false, isCritFail: false, rollId });
 // Refresh active effects UI and spell buttons so applied effects are visible
 updateActiveEffectsUI();
@@ -1097,36 +1130,75 @@ let _lastDupoDesc = null;
 function chooseDupoResult(which) {
     const weaponOutput = document.getElementById('weapon-output');
     if (!weaponOutput) return;
-    if (which === 'a' && _lastDupoA) {
-        weaponOutput.innerHTML = `<div style="margin-bottom:15px;color:#0f0;font-weight:bold;">${_lastDupoDesc} — Selected: Shot A</div>${_lastDupoA.html}`;
-        recordRoll({ total: _lastDupoA.total, title: `${_lastDupoDesc} (Shot A)`, breakdownHtml: _lastDupoA.html, isCritSuccess: false, isCritFail: false });
-        updateActiveEffectsUI();
-        updateSpellButtons();
-        updateAttackHighlights();
-    } else if (which === 'b' && _lastDupoB) {
-        weaponOutput.innerHTML = `<div style="margin-bottom:15px;color:#0f0;font-weight:bold;">${_lastDupoDesc} — Selected: Shot B</div>${_lastDupoB.html}`;
-        recordRoll({ total: _lastDupoB.total, title: `${_lastDupoDesc} (Shot B)`, breakdownHtml: _lastDupoB.html, isCritSuccess: false, isCritFail: false });
-        updateActiveEffectsUI();
-        updateSpellButtons();
-        updateAttackHighlights();
-    }
-    else if (which === 'combine' && _lastDupoA && _lastDupoB) {
-        const combinedTotal = (_lastDupoA.total || 0) + (_lastDupoB.total || 0);
-        const combinedHtml = `<div style="margin-bottom:15px;color:#0f0;font-weight:bold;">${_lastDupoDesc} — Combined Shots (A + B)</div>` +
-            `<div style="display:flex;gap:20px;flex-wrap:wrap;">` +
-            `<div style="flex:1;min-width:220px;background:#222;padding:10px;border-radius:6px;">${_lastDupoA.html}</div>` +
-            `<div style="flex:1;min-width:220px;background:#222;padding:10px;border-radius:6px;">${_lastDupoB.html}</div>` +
-            `</div>` +
-            `<div style="margin-top:12px;color:#ff0;font-weight:800;font-size:1.1em;">Combined Total: ${combinedTotal}</div>`;
-
-        weaponOutput.innerHTML = combinedHtml;
-        recordRoll({ total: combinedTotal, title: `${_lastDupoDesc} (Combined Shots)`, breakdownHtml: combinedHtml, isCritSuccess: false, isCritFail: false });
+    // Helper to render chosen result and record
+    function finalizeAndRecord(titleSuffix, htmlContent, totalValue) {
+        weaponOutput.innerHTML = `<div style="margin-bottom:15px;color:#0f0;font-weight:bold;">${_lastDupoDesc} — ${titleSuffix}</div>` + htmlContent;
+        recordRoll({ total: totalValue, title: `${_lastDupoDesc} (${titleSuffix})`, breakdownHtml: htmlContent, isCritSuccess: false, isCritFail: false });
         updateActiveEffectsUI();
         updateSpellButtons();
         updateAttackHighlights();
         _lastDupoA = null; _lastDupoB = null; _lastDupoDesc = null;
+    }
+
+    if ((which === 'a' || which === 'a-crit') && _lastDupoA) {
+        const isCrit = which === 'a-crit';
+        const total = isCrit ? (_lastDupoA.total * 2) : _lastDupoA.total;
+        let html = _lastDupoA.html;
+        if (isCrit) html += `<div style="margin-top:8px;color:#f88;font-weight:800;">Critical Hit applied to Shot A — damage x2: ${total}</div>`;
+        finalizeAndRecord(`Selected: Shot A${isCrit ? ' (Crit)' : ''}`, html, total);
         return;
     }
+
+    if ((which === 'b' || which === 'b-crit') && _lastDupoB) {
+        const isCrit = which === 'b-crit';
+        const total = isCrit ? (_lastDupoB.total * 2) : _lastDupoB.total;
+        let html = _lastDupoB.html;
+        if (isCrit) html += `<div style="margin-top:8px;color:#f88;font-weight:800;">Critical Hit applied to Shot B — damage x2: ${total}</div>`;
+        finalizeAndRecord(`Selected: Shot B${isCrit ? ' (Crit)' : ''}`, html, total);
+        return;
+    }
+
+    if (which === 'combine' && _lastDupoA && _lastDupoB) {
+        const combinedTotal = (_lastDupoA.total || 0) + (_lastDupoB.total || 0);
+        const combinedHtml = `<div style="display:flex;gap:20px;flex-wrap:wrap;">` +
+            `<div style="flex:1;min-width:220px;background:#222;padding:10px;border-radius:6px;">${_lastDupoA.html}</div>` +
+            `<div style="flex:1;min-width:220px;background:#222;padding:10px;border-radius:6px;">${_lastDupoB.html}</div>` +
+            `</div>` + `<div style="margin-top:12px;color:#ff0;font-weight:800;font-size:1.1em;">Combined Total: ${combinedTotal}</div>`;
+        finalizeAndRecord('Combined Shots (A + B)', combinedHtml, combinedTotal);
+        return;
+    }
+
+    if (which === 'combine-crit-a' && _lastDupoA && _lastDupoB) {
+        const combinedTotal = ((_lastDupoA.total || 0) * 2) + (_lastDupoB.total || 0);
+        const combinedHtml = `<div style="display:flex;gap:20px;flex-wrap:wrap;">` +
+            `<div style="flex:1;min-width:220px;background:#222;padding:10px;border-radius:6px;">${_lastDupoA.html}<div style=\"margin-top:8px;color:#f88;font-weight:800;\">Critical Hit applied to Shot A (x2)</div></div>` +
+            `<div style="flex:1;min-width:220px;background:#222;padding:10px;border-radius:6px;">${_lastDupoB.html}</div>` +
+            `</div>` + `<div style="margin-top:12px;color:#ff0;font-weight:800;font-size:1.1em;">Combined Total (Crit A): ${combinedTotal}</div>`;
+        finalizeAndRecord('Combined Shots (Crit A)', combinedHtml, combinedTotal);
+        return;
+    }
+
+    if (which === 'combine-crit-b' && _lastDupoA && _lastDupoB) {
+        const combinedTotal = (_lastDupoA.total || 0) + ((_lastDupoB.total || 0) * 2);
+        const combinedHtml = `<div style="display:flex;gap:20px;flex-wrap:wrap;">` +
+            `<div style="flex:1;min-width:220px;background:#222;padding:10px;border-radius:6px;">${_lastDupoA.html}</div>` +
+            `<div style="flex:1;min-width:220px;background:#222;padding:10px;border-radius:6px;">${_lastDupoB.html}<div style=\"margin-top:8px;color:#f88;font-weight:800;\">Critical Hit applied to Shot B (x2)</div></div>` +
+            `</div>` + `<div style="margin-top:12px;color:#ff0;font-weight:800;font-size:1.1em;">Combined Total (Crit B): ${combinedTotal}</div>`;
+        finalizeAndRecord('Combined Shots (Crit B)', combinedHtml, combinedTotal);
+        return;
+    }
+
+    if (which === 'combine-crit-both' && _lastDupoA && _lastDupoB) {
+        const combinedTotal = ((_lastDupoA.total || 0) * 2) + ((_lastDupoB.total || 0) * 2);
+        const combinedHtml = `<div style="display:flex;gap:20px;flex-wrap:wrap;">` +
+            `<div style="flex:1;min-width:220px;background:#222;padding:10px;border-radius:6px;">${_lastDupoA.html}<div style=\"margin-top:8px;color:#f88;font-weight:800;\">Critical Hit applied to Shot A (x2)</div></div>` +
+            `<div style="flex:1;min-width:220px;background:#222;padding:10px;border-radius:6px;">${_lastDupoB.html}<div style=\"margin-top:8px;color:#f88;font-weight:800;\">Critical Hit applied to Shot B (x2)</div></div>` +
+            `</div>` + `<div style="margin-top:12px;color:#ff0;font-weight:800;font-size:1.1em;">Combined Total (Crit Both): ${combinedTotal}</div>`;
+        finalizeAndRecord('Combined Shots (Crit Both)', combinedHtml, combinedTotal);
+        return;
+    }
+
+    // Fallback: clear stored values
     _lastDupoA = null; _lastDupoB = null; _lastDupoDesc = null;
 }
 
@@ -1273,6 +1345,43 @@ function longRest() {
     currentHealth = maxHealth;
     saveHealth();
     updateHealthUI();
+}
+
+// Short Rest: heal 4d10 points of health (fair dice)
+function shortRest() {
+    const weaponOutput = document.getElementById('weapon-output');
+    const rolls = [];
+    let totalHeal = 0;
+    for (let i = 0; i < 4; i++) {
+        const r = rollDie(10);
+        rolls.push(r);
+        totalHeal += r;
+    }
+    // Apply healing
+    changeHealth(totalHeal);
+
+    const html = `<div style="font-weight:700;color:#0f0;">Short Rest: Healed ${totalHeal} HP</div>` +
+        `<div style="color:#fff;margin-top:8px;">4d10: [${rolls.join(', ')}]</div>`;
+    if (weaponOutput) weaponOutput.innerHTML = html;
+    recordRoll({ total: totalHeal, title: 'Short Rest (4d10)', breakdownHtml: html, isCritSuccess: false, isCritFail: false });
+}
+
+// Toggle critical for next single attack (non-Dupo)
+function toggleCritNext() {
+    critNext = !critNext;
+    updateCritButtonUI();
+}
+
+function updateCritButtonUI() {
+    const btn = document.getElementById('crit-toggle');
+    if (!btn) return;
+    if (critNext) {
+        btn.textContent = 'Crit Next Attack: On';
+        btn.classList.add('effect-active');
+    } else {
+        btn.textContent = 'Crit Next Attack: Off';
+        btn.classList.remove('effect-active');
+    }
 }
 
 // --- Magic UI: Cantrips and Disguise Self persistence ---
@@ -1922,6 +2031,6 @@ function showPdf(url, name) {
 function closePdfViewer() {
     const modal = document.getElementById('pdf-viewer-modal');
     const frame = document.getElementById('pdf-frame');
-    if (frame) frame.src = ''; 
+    if (frame) frame.src = '';
     if (modal) modal.style.display = 'none';
 }
