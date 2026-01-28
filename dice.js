@@ -1352,18 +1352,22 @@ function shortRest() {
     const weaponOutput = document.getElementById('weapon-output');
     const rolls = [];
     let totalHeal = 0;
+    // 4d10 + 1d8
     for (let i = 0; i < 4; i++) {
         const r = rollDie(10);
         rolls.push(r);
         totalHeal += r;
     }
+    const r8 = rollDie(8);
+    rolls.push(r8);
+    totalHeal += r8;
     // Apply healing
     changeHealth(totalHeal);
 
     const html = `<div style="font-weight:700;color:#0f0;">Short Rest: Healed ${totalHeal} HP</div>` +
-        `<div style="color:#fff;margin-top:8px;">4d10: [${rolls.join(', ')}]</div>`;
+        `<div style="color:#fff;margin-top:8px;">4d10 + 1d8: [${rolls.slice(0,4).join(', ')}] + [${rolls[4]}]</div>`;
     if (weaponOutput) weaponOutput.innerHTML = html;
-    recordRoll({ total: totalHeal, title: 'Short Rest (4d10)', breakdownHtml: html, isCritSuccess: false, isCritFail: false });
+    recordRoll({ total: totalHeal, title: 'Short Rest (4d10+1d8)', breakdownHtml: html, isCritSuccess: false, isCritFail: false });
 }
 
 // Toggle critical for next single attack (non-Dupo)
