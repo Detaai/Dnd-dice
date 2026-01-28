@@ -178,7 +178,8 @@
                 <h3>Magic</h3>
                 <div class="card-actions">
                     <button class="weapon-btn secondary-action" onclick="openMagicRingSelector()">Magic Rings</button>
-                    <button class="weapon-btn secondary-action" onclick="longRest()">Long Rest</button>
+                    <button class="weapon-btn secondary-action" onclick="shortRest()">Short Rest (4d10)</button>
+                    <button class="weapon-btn secondary-action" onclick="longRest()" style="margin-left:8px;">Long Rest</button>
                 </div>
                     <div id="ring-status" style="display: none; margin-top: 12px; padding: 12px; background: #333; border-radius: 8px; border: 2px solid #888; color:#fff;">
                         <h3 style="color: #0f0; margin-top:0;">Equipped Magic Rings</h3>
@@ -237,6 +238,7 @@
                 <h3>Weapons</h3>
                 <div class="card-actions" style="margin-top:8px;">
                     <button class="weapon-btn secondary-action" onclick="openMagicWeaponSelector()">Magic Weapons</button>
+                    <button id="crit-toggle" class="weapon-btn secondary-action" onclick="toggleCritNext()" style="margin-left:8px;">Crit Next Attack: Off</button>
                 </div>
                 <div id="weapon-status" style="display: none; margin-top: 12px; padding: 12px; background: #333; border-radius: 8px; border: 2px solid #666; color:#fff;">
                     <h4 style="color:#0f0;margin:0 0 8px 0;">Equipped Magic Weapons</h4>
@@ -380,4 +382,3 @@
     </div>
 </body>
 </html>
-
