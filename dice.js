@@ -32,29 +32,30 @@ document.head.appendChild(style);
 
 // Global lowest mode toggled by clicking the 'Choose' label
 let globalLowest = false;
-document.getElementById('choose-label').addEventListener('click', function() {
-globalLowest = !globalLowest;
-});
+const _chooseLabel = document.getElementById('choose-label');
+if (_chooseLabel) {
+    _chooseLabel.addEventListener('click', function() { globalLowest = !globalLowest; });
+}
 
 // Global loaded mode toggled by clicking the title
 let globalLoaded = false;
 let diceCountInput = document.getElementById('dice-count');
 
 function attachDiceInputListeners(inputElem) {
-inputElem.addEventListener('input', function() {
-updateDiceSelectors();
-});
-inputElem.addEventListener('keydown', function(e) {
-if (e.key === 'Enter') {
-document.getElementById('roll-btn').click();
-}
-});
+    if (!inputElem) return;
+    inputElem.addEventListener('input', function() {
+        updateDiceSelectors();
+    });
+    inputElem.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            const rb = document.getElementById('roll-btn'); if (rb) rb.click();
+        }
+    });
 }
 
 // Toggle loaded mode by clicking the title
-document.getElementById('dice-title').addEventListener('click', function() {
-globalLoaded = !globalLoaded;
-});
+const _diceTitle = document.getElementById('dice-title');
+if (_diceTitle) { _diceTitle.addEventListener('click', function() { globalLoaded = !globalLoaded; }); }
 
 attachDiceInputListeners(diceCountInput);
 
@@ -152,16 +153,18 @@ function animateRoll(sides, callback) {
     }
     diceFace.classList.add('rolling');
     let frames = 20;
-    let interval = 30;
+    let interval = 40;
     let count = 0;
     const rollAnim = setInterval(() => {
-        diceNumber.textContent = Math.floor(Math.random() * sides) + 1;
+        // smooth change: fade number out, then change, then fade in
+        const tmp = Math.floor(Math.random() * sides) + 1;
+        smoothUpdateNumber(diceNumber, tmp);
         count++;
         if (count >= frames) {
             clearInterval(rollAnim);
             diceFace.classList.remove('rolling');
             const result = rollDie(sides);
-            diceNumber.textContent = result;
+            smoothUpdateNumber(diceNumber, result);
             if (callback) callback(result);
         }
     }, interval);
@@ -196,6 +199,25 @@ return '<svg width="60" height="60" viewBox="0 0 60 60"><polygon points="30,5 55
 default:
 return '';
 }
+
+}
+// Smooth number updater: fades out, changes text, fades in.
+// Smooth number updater: fades out, changes text, fades in.
+function smoothUpdateNumber(el, value) {
+    if (!el) return;
+    try {
+        // If already fading, just replace the value after current cycle
+        if (el._fadeTimeout) {
+            clearTimeout(el._fadeTimeout);
+            el._fadeTimeout = null;
+        }
+        el.classList.add('fading');
+        el._fadeTimeout = setTimeout(() => {
+            el.textContent = String(value);
+            el.classList.remove('fading');
+            el._fadeTimeout = null;
+        }, 120);
+    } catch (e) { el.textContent = String(value); }
 }
 
 function createDiceFace(index, sides) {
@@ -218,9 +240,9 @@ diceFace.innerHTML = `
 diceFace.addEventListener('click', function() {
 const diceNumber = diceFace.querySelector('.dice-number');
 if (globalLoaded) {
-diceNumber.textContent = sides;
+    smoothUpdateNumber(diceNumber, sides);
 } else if (globalLowest) {
-diceNumber.textContent = 1;
+    smoothUpdateNumber(diceNumber, 1);
 }
 });
 
@@ -238,29 +260,30 @@ diceFacesContainer.appendChild(diceFace);
 diceFaces.push(diceFace);
 }
 
-diceFaces.forEach((diceFace, i) => {
-const diceNumber = diceFace.querySelector('.dice-number');
-diceFace.classList.add('rolling');
-let frames = 20;
-let interval = 30;
-let frameCount = 0;
-const rollAnim = setInterval(() => {
-diceNumber.textContent = Math.floor(Math.random() * sides) + 1;
-frameCount++;
-if (frameCount >= frames) {
-clearInterval(rollAnim);
-diceFace.classList.remove('rolling');
-let result;
-// Loaded mode applies to every other die if count > 2
-if (loadedMode && (count <= 2 ?  true : i % 2 === 0)) {
-result = sides;
-} else {
-result = rollDie(sides);
-}
-diceNumber.textContent = result;
-}
-}, interval);
-});
+    diceFaces.forEach((diceFace, i) => {
+        const diceNumber = diceFace.querySelector('.dice-number');
+        diceFace.classList.add('rolling');
+        let frames = 20;
+        let interval = 40;
+        let frameCount = 0;
+        const rollAnim = setInterval(() => {
+            const tmp = Math.floor(Math.random() * sides) + 1;
+            smoothUpdateNumber(diceNumber, tmp);
+            frameCount++;
+            if (frameCount >= frames) {
+                clearInterval(rollAnim);
+                diceFace.classList.remove('rolling');
+                let result;
+                // Loaded mode applies to every other die if count > 2
+                if (loadedMode && (count <= 2 ?  true : i % 2 === 0)) {
+                    result = sides;
+                } else {
+                    result = rollDie(sides);
+                }
+                smoothUpdateNumber(diceNumber, result);
+            }
+        }, interval);
+    });
 }
 
 const diceTypes = [4, 6, 8, 10, 12, 20];
@@ -301,73 +324,78 @@ diceSelectors.appendChild(select);
 updateDiceSelectors();
 
 function animateRollDiceMulti(sidesArr, loadedMode) {
-const diceFacesContainer = document.getElementById('dice-faces');
-diceFacesContainer.innerHTML = '';
-const diceTotal = document.getElementById('dice-total');
-diceTotal.textContent = '';
+    const diceFacesContainer = document.getElementById('dice-faces');
+    if (!diceFacesContainer) return;
+    diceFacesContainer.innerHTML = '';
+    const diceTotal = document.getElementById('dice-total');
+    if (diceTotal) diceTotal.textContent = '';
 
-const diceFaces = [];
-let results = Array(sidesArr.length).fill(0);
+    const diceFaces = [];
+    let results = Array(sidesArr.length).fill(0);
+    let failTriggered = false;
+    let finished = 0;
 
-sidesArr.forEach((sides, i) => {
-const diceFace = createDiceFace(i, sides);
-diceFace.dataset.index = i;
-diceFacesContainer.appendChild(diceFace);
-diceFaces.push(diceFace);
-});
+    // create faces
+    sidesArr.forEach((sides, i) => {
+        const face = createDiceFace(i, sides);
+        diceFacesContainer.appendChild(face);
+        diceFaces.push(face);
+    });
 
-let failTriggered = false;
+    // animate each face
+    diceFaces.forEach((diceFace, i) => {
+        const diceNumber = diceFace.querySelector('.dice-number');
+        diceFace.classList.add('rolling');
+        let frames = 20;
+        let interval = 40;
+        let frameCount = 0;
+        const rollAnim = setInterval(() => {
+            const tmp = Math.floor(Math.random() * sidesArr[i]) + 1;
+            smoothUpdateNumber(diceNumber, tmp);
+            frameCount++;
+            if (frameCount >= frames) {
+                clearInterval(rollAnim);
+                diceFace.classList.remove('rolling');
+                const result = (loadedMode && (sidesArr.length <= 2 ? true : i % 2 === 0)) ? sidesArr[i] : (globalLowest ? 1 : rollDie(sidesArr[i]));
+                smoothUpdateNumber(diceNumber, result);
+                results[i] = result;
 
-diceFaces.forEach((diceFace, i) => {
-const diceNumber = diceFace.querySelector('.dice-number');
-diceFace.classList.add('rolling');
-let frames = 20;
-let interval = 30;
-let frameCount = 0;
-const rollAnim = setInterval(() => {
-diceNumber.textContent = Math.floor(Math.random() * sidesArr[i]) + 1;
-frameCount++;
-if (frameCount >= frames) {
-clearInterval(rollAnim);
-diceFace.classList.remove('rolling');
-let result = globalLoaded ? sidesArr[i] : (globalLowest ? 1 : rollDie(sidesArr[i]));
-diceNumber.textContent = result;
-results[i] = result;
+                if (result === 1 && !failTriggered) {
+                    failTriggered = true;
+                    showFailMessage();
+                }
 
-if (result === 1 && !failTriggered) {
-failTriggered = true;
-showFailMessage();
+                finished++;
+                if (finished === sidesArr.length) {
+                    const total = results.reduce((a, b) => a + b, 0);
+                    if (diceTotal) diceTotal.textContent = `Total: ${total}`;
+                    // detect crits on any d20
+                    let isCritSuccess = false;
+                    let isCritFail = false;
+                    sidesArr.forEach((s, idx) => {
+                        if (s === 20) {
+                            if (results[idx] === 20) isCritSuccess = true;
+                            if (results[idx] === 1) isCritFail = true;
+                        }
+                    });
+                    const breakdown = sidesArr.map((s, idx) => `${s}:[${results[idx]}]`).join(', ');
+                    recordRoll({ total, title: 'Custom Roll', breakdownHtml: `<div style="color:#fff">${breakdown}</div>`, isCritSuccess, isCritFail });
+                }
+            }
+        }, interval);
+    });
 }
-
-// Show total after all dice finish
-if (results.every(r => r > 0)) {
-                const total = results.reduce((a, b) => a + b, 0);
-                diceTotal.textContent = `Total: ${total}`;
-                // detect crits on any d20
-                let isCritSuccess = false;
-                let isCritFail = false;
-                sidesArr.forEach((sides, idx) => {
-                    if (sides === 20) {
-                        if (results[idx] === 20) isCritSuccess = true;
-                        if (results[idx] === 1) isCritFail = true;
-                    }
-                });
-                const breakdown = sidesArr.map((s, idx) => `${s}:[${results[idx]}]`).join(', ');
-                recordRoll({ total, title: 'Custom Roll', breakdownHtml: `<div style="color:#fff">${breakdown}</div>`, isCritSuccess, isCritFail });
+const _rollBtn = document.getElementById('roll-btn');
+if (_rollBtn) {
+    _rollBtn.addEventListener('click', () => {
+        const selects = document.querySelectorAll('.dice-select');
+        if (selects.length === 0) {
+            return; // No dice to roll
+        }
+        const sidesArr = Array.from(selects).map(sel => parseInt(sel.value));
+        animateRollDiceMulti(sidesArr, loaded);
+    });
 }
-}
-}, interval);
-});
-}
-
-document.getElementById('roll-btn').addEventListener('click', () => {
-const selects = document.querySelectorAll('.dice-select');
-if (selects.length === 0) {
-return; // No dice to roll
-}
-const sidesArr = Array.from(selects).map(sel => parseInt(sel.value));
-animateRollDiceMulti(sidesArr, loaded);
-});
 
 // Character Weapon System
 
@@ -1524,13 +1552,72 @@ function saveHealth() {
 }
 
 function updateHealthUI() {
-    const el = document.getElementById('health-display');
-    if (!el) return;
-    el.textContent = `${currentHealth} / ${maxHealth}`;
-    // colorize based on thresholds
-    if (currentHealth <= 0) el.style.color = '#f55';
-    else if (currentHealth <= Math.floor(maxHealth * 0.3)) el.style.color = '#ffb86b';
-    else el.style.color = '#ffd';
+    // Update both the main health display and the header health
+    const mainEl = document.getElementById('health-display');
+    const headerEl = document.getElementById('health-header');
+    const halfThreshold = Math.floor(maxHealth / 2);
+    [mainEl, headerEl].forEach(el => {
+        if (!el) return;
+        el.textContent = `${currentHealth} / ${maxHealth}`;
+        // colorize: dead => red, <= half => orange, otherwise normal
+        if (currentHealth <= 0) el.style.color = '#f55';
+        else if (currentHealth <= halfThreshold) el.style.color = '#ffb86b';
+        else el.style.color = '#ffd';
+    });
+
+    // Toggle heartbeat/theme pulse when at or below half health
+    try {
+        if (currentHealth > 0 && currentHealth <= halfThreshold) {
+            document.body.classList.add('low-health');
+            // ensure overlay exists (with theme layers)
+            let overlay = document.getElementById('health-overlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'health-overlay';
+                const thPurple = document.createElement('div'); thPurple.className = 'theme-purple';
+                const thRed = document.createElement('div'); thRed.className = 'theme-red';
+                const thCrit = document.createElement('div'); thCrit.className = 'theme-critical';
+                const pulse = document.createElement('div'); pulse.className = 'pulse';
+                overlay.appendChild(thPurple);
+                overlay.appendChild(thRed);
+                overlay.appendChild(thCrit);
+                overlay.appendChild(pulse);
+                document.body.appendChild(overlay);
+            }
+        } else {
+            document.body.classList.remove('low-health');
+        }
+    } catch (e) { /* ignore DOM errors */ }
+
+    // critical health: heavy red + black pulse when at or below 10 HP
+    try {
+        const CRITICAL_THRESHOLD = 10;
+        let overlay = document.getElementById('health-overlay');
+        if (currentHealth > 0 && currentHealth <= CRITICAL_THRESHOLD) {
+            document.body.classList.add('critical-health');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'health-overlay';
+                const thPurple = document.createElement('div'); thPurple.className = 'theme-purple';
+                const thRed = document.createElement('div'); thRed.className = 'theme-red';
+                const thCrit = document.createElement('div'); thCrit.className = 'theme-critical';
+                const pulse = document.createElement('div'); pulse.className = 'pulse';
+                overlay.appendChild(thPurple);
+                overlay.appendChild(thRed);
+                overlay.appendChild(thCrit);
+                overlay.appendChild(pulse);
+                document.body.appendChild(overlay);
+            } else {
+                // ensure critical layer exists
+                if (!overlay.querySelector('.theme-critical')) {
+                    const thCrit = document.createElement('div'); thCrit.className = 'theme-critical';
+                    overlay.insertBefore(thCrit, overlay.querySelector('.pulse') || null);
+                }
+            }
+        } else {
+            document.body.classList.remove('critical-health');
+        }
+    } catch (e) { /* ignore DOM errors */ }
 }
 
 function changeHealth(delta) {
@@ -1540,6 +1627,31 @@ function changeHealth(delta) {
     updateHealthUI();
     const out = document.getElementById('weapon-output') || document.getElementById('magic-output');
     if (out) out.innerHTML = `<div style="color:#fff;">Health: ${currentHealth}/${maxHealth}</div>`;
+    // If HP reached 0, fade out and redirect to saving-throws
+    try {
+        if (currentHealth <= 0 && !_deathTransitioning) {
+            _deathTransitioning = true;
+            // create full-screen black overlay
+            const overlay = document.createElement('div');
+            overlay.style.position = 'fixed';
+            overlay.style.top = '0';
+            overlay.style.left = '0';
+            overlay.style.width = '100%';
+            overlay.style.height = '100%';
+            overlay.style.background = '#000';
+            overlay.style.opacity = '0';
+            overlay.style.zIndex = '999999';
+            overlay.style.transition = 'opacity 800ms ease-in';
+            document.body.appendChild(overlay);
+            // trigger fade
+            requestAnimationFrame(()=>{ overlay.style.opacity = '1'; });
+            // After fade, redirect to saving throws
+            setTimeout(()=>{
+                try { localStorage.setItem('diedAt','1'); } catch(e){}
+                window.location.href = 'saving-throws.html';
+            }, 1000);
+        }
+    } catch (e) { /* ignore */ }
 }
 
 function resetHealth() {
@@ -1558,6 +1670,125 @@ function initHealth() {
 
 // initialize health UI
 initHealth();
+
+// If player was revived from death via saving-throws, grant 1 HP and clear flag
+try {
+    const revived = localStorage.getItem('revivedFromDeath');
+    if (revived === '1') {
+        currentHealth = 1;
+        saveHealth();
+        updateHealthUI();
+        localStorage.removeItem('revivedFromDeath');
+        const out = document.getElementById('weapon-output') || document.getElementById('magic-output');
+        if (out) out.innerHTML = `<div style="color:#0f0;">You revived with 1 HP.</div>`;
+    }
+} catch (e) { /* ignore storage errors */ }
+
+let _deathTransitioning = false;
+
+// --- Armor Class (AC) tracker ---
+const AC_KEY = 'characterAC';
+const DEFAULT_AC = 15;
+let currentAC = DEFAULT_AC;
+
+function loadAC() {
+    const v = parseInt(localStorage.getItem(AC_KEY), 10);
+    currentAC = isNaN(v) ? DEFAULT_AC : v;
+}
+
+function saveAC() {
+    localStorage.setItem(AC_KEY, String(currentAC));
+}
+
+function updateACUI() {
+    const small = document.getElementById('ac-display');
+    const large = document.getElementById('ac-large');
+    if (small) small.textContent = String(currentAC);
+    if (large) large.textContent = `AC: ${String(currentAC)}`;
+    // update calc explanation if present
+    const acCalc = document.getElementById('ac-calc');
+    if (acCalc) acCalc.textContent = String(currentAC);
+}
+
+// Helper: read ability score by label from the stat cards
+function getAbilityScore(label) {
+    try {
+        const cards = document.querySelectorAll('.stat-card');
+        for (let i = 0; i < cards.length; i++) {
+            const lab = cards[i].querySelector('.stat-label');
+            const val = cards[i].querySelector('.stat-score');
+            if (lab && val && lab.textContent.trim().toUpperCase() === label.toUpperCase()) {
+                const n = parseInt(val.textContent.trim(), 10);
+                return isNaN(n) ? null : n;
+            }
+        }
+    } catch (e) {
+        return null;
+    }
+    return null;
+}
+
+// Compute AC from armor (studded leather = 12 + Dex mod). Update currentAC and explanation.
+function updateArmorAC() {
+    // default to stored currentAC if we can't compute
+    const armorEl = document.getElementById('armor-type');
+    const armor = armorEl ? armorEl.textContent.trim().toLowerCase() : '';
+    // find DEX score
+    const dex = getAbilityScore('DEX');
+    const dexMod = (typeof dex === 'number') ? Math.floor((dex - 10) / 2) : 0;
+    let computed = currentAC;
+    if (armor && armor.includes('studded')) {
+        const base = 12;
+        computed = base + dexMod;
+        // update explanation text if element exists
+        const explain = document.getElementById('ac-explain');
+        if (explain) {
+            explain.textContent = `${base} (studded leather) + Dex mod (${dexMod >= 0 ? '+'+dexMod : dexMod}) = `;
+            const acCalc = document.getElementById('ac-calc');
+            if (acCalc) acCalc.textContent = String(computed);
+        }
+    }
+    currentAC = computed;
+    saveAC();
+}
+
+function initAC() {
+    loadAC();
+    // compute AC from equipped armor if possible (studded leather = 12 + Dex mod)
+    updateArmorAC();
+    updateACUI();
+    const small = document.getElementById('ac-display');
+    const large = document.getElementById('ac-large');
+
+    function parseACFromText(text) {
+        if (!text) return NaN;
+        const m = text.match(/(\d+)/);
+        return m ? parseInt(m[1], 10) : NaN;
+    }
+
+    function attachCommitHandlers(el, isLarge) {
+        if (!el) return;
+        el.addEventListener('blur', () => {
+            const raw = el.textContent || '';
+            const n = parseACFromText(raw);
+            if (isNaN(n)) {
+                updateACUI();
+                return;
+            }
+            currentAC = Math.max(0, Math.min(30, n));
+            saveAC();
+            updateACUI();
+        });
+        el.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
+        });
+    }
+
+    attachCommitHandlers(small, false);
+    attachCommitHandlers(large, true);
+}
+// initialize AC UI
+initAC();
 
 // initialize trackers (initiative & currency)
 initTrackers();
@@ -2038,3 +2269,55 @@ function closePdfViewer() {
     if (frame) frame.src = '';
     if (modal) modal.style.display = 'none';
 }
+
+// Sanity checks: run a lightweight set of function calls on DOM ready and report results to console
+function runSanityChecks() {
+    const results = [];
+    try {
+        const d = rollDie(6);
+        results.push(`rollDie(6) -> ${d}`);
+    } catch (e) { results.push(`rollDie error: ${e.message}`); }
+    try {
+        const dd = rollDamageDie(6);
+        results.push(`rollDamageDie(6) -> ${dd}`);
+    } catch (e) { results.push(`rollDamageDie error: ${e.message}`); }
+    try {
+        const svg = getDiceShape(6);
+        results.push(`getDiceShape(6) -> length ${svg.length}`);
+    } catch (e) { results.push(`getDiceShape error: ${e.message}`); }
+    try {
+        const id = generateRollId();
+        results.push(`generateRollId -> ${id}`);
+    } catch (e) { results.push(`generateRollId error: ${e.message}`); }
+    try {
+        updateDiceSelectors();
+        results.push('updateDiceSelectors -> ok');
+    } catch (e) { results.push(`updateDiceSelectors error: ${e.message}`); }
+    try {
+        updateArmorAC(); updateACUI();
+        results.push(`updateArmorAC/updateACUI -> AC ${typeof currentAC !== 'undefined' ? currentAC : 'unknown'}`);
+    } catch (e) { results.push(`updateArmorAC error: ${e.message}`); }
+
+    console.group('Sanity Checks');
+    results.forEach(r => console.log(r));
+    console.groupEnd();
+
+    const out = document.getElementById('weapon-output') || document.getElementById('magic-output');
+    if (out) {
+        out.innerHTML = `<div style="color:#cfe;font-weight:700;padding:6px;border-radius:6px;">Sanity checks run — open console for details.</div>`;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', runSanityChecks);
+
+// Global error handlers to surface runtime errors in the UI for easier debugging
+window.addEventListener('error', function (ev) {
+    console.error('Unhandled error', ev.error || ev.message, ev);
+    const out = document.getElementById('weapon-output') || document.getElementById('magic-output');
+    if (out) out.innerHTML = `<div style="color:#f88;font-weight:700;">Runtime error: ${String(ev.error || ev.message)}</div>`;
+});
+window.addEventListener('unhandledrejection', function (ev) {
+    console.error('Unhandled promise rejection', ev.reason);
+    const out = document.getElementById('weapon-output') || document.getElementById('magic-output');
+    if (out) out.innerHTML = `<div style="color:#f88;font-weight:700;">Promise rejection: ${String(ev.reason)}</div>`;
+});

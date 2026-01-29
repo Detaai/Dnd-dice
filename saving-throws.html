@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Saving Throws</title>
+  <style>
+    html,body{height:100%;margin:0}
+    body{background:#000;display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial,Helvetica,sans-serif}
+    .container{display:flex;flex-direction:column;align-items:center;gap:28px}
+    .grid{display:grid;grid-template-columns:repeat(3,88px);grid-gap:24px}
+    .circle{width:88px;height:88px;border-radius:50%;background:#111;box-shadow:0 0 0 4px rgba(255,255,255,0.02) inset,0 6px 18px rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .18s, transform .12s}
+    .circle:active{transform:scale(.96)}
+    .circle.green{background:#0f0}
+    .circle.red{background:#b12}
+    .revive{padding:10px 18px;border-radius:8px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.06);cursor:pointer}
+    .revive:active{transform:translateY(1px)}
+    @media (max-width:480px){.grid{grid-template-columns:repeat(3,68px);grid-gap:16px}.circle{width:68px;height:68px}}
+  </style>
+</head>
+<body>
+  <div class="container" role="main">
+    <div class="grid" id="circles">
+      <div class="circle" data-group="a" id="c0"></div>
+      <div class="circle" data-group="a" id="c1"></div>
+      <div class="circle" data-group="a" id="c2"></div>
+      <div class="circle" data-group="b" id="c3"></div>
+      <div class="circle" data-group="b" id="c4"></div>
+      <div class="circle" data-group="b" id="c5"></div>
+    </div>
+    <button class="revive" id="revive">revive</button>
+  </div>
+
+  <script>
+    (function(){
+      const groups = { a: [0,1,2], b: [3,4,5] };
+      const circles = Array.from({length:6},(_,i)=>document.getElementById('c'+i));
+      function setGroupState(activeGroup){
+        // activeGroup: 'a' or 'b'
+        Object.keys(groups).forEach(g=>{
+          groups[g].forEach(idx=>{
+            const el = circles[idx];
+            if (!el) return;
+            el.classList.remove('green','red');
+            if (g === activeGroup) el.classList.add('green');
+            else el.classList.add('red');
+          });
+        });
+        // if the active group has all three green -> go to index
+        const allGreen = groups[activeGroup].every(i=>circles[i].classList.contains('green'));
+        if (allGreen) {
+          window.location.href = 'index.html';
+        }
+      }
+
+      // Only life-group circles (first three) are clickable; death circles do nothing
+      const lifeIdx = [0,1,2];
+      lifeIdx.forEach(i=>{
+        const el = circles[i];
+        if (!el) return;
+        el.addEventListener('click', ()=>{
+          if (!el.classList.contains('green')) el.classList.add('green');
+          const allGreen = lifeIdx.every(idx=>circles[idx].classList.contains('green'));
+          if (allGreen) {
+            try { localStorage.setItem('revivedFromDeath','1'); } catch(e){}
+            window.location.href = 'index.html';
+          }
+        });
+      });
+
+      // revive button takes back to index
+      const revive = document.getElementById('revive');
+      revive.addEventListener('click', ()=>{ try { localStorage.setItem('revivedFromDeath','1'); } catch(e){}; window.location.href = 'index.html'; });
+
+      // Death-group circles (last three) turn red when clicked but do not redirect
+      const deathIdx = [3,4,5];
+      deathIdx.forEach(i=>{
+        const el = circles[i];
+        if (!el) return;
+        el.addEventListener('click', ()=>{
+          el.classList.remove('green');
+          el.classList.add('red');
+        });
+      });
+
+      // Start with all neutral (dark) — no class
+      // But ensure page is only the UI described: nothing else
+    })();
+  </script>
+</body>
+</html>
