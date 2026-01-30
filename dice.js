@@ -939,6 +939,27 @@ function scheduleBumberAutoHide(ms) {
     }, ms || 5000);
 }
 
+// Player movement speed tracking
+const PLAYER_BASE_SPEED = 20; // feet
+
+function computeCurrentSpeed() {
+    // Base speed
+    let speed = PLAYER_BASE_SPEED;
+    // Add movement bonuses from active effects (e.g., Zephyr Strike, First Turn Speed)
+    activeEffects.forEach(e => {
+        if (!e || typeof e.movementBonus === 'undefined') return;
+        if (e.state === 'active') speed += parseInt(e.movementBonus || 0, 10);
+    });
+    return speed;
+}
+
+function updateSpeedDisplay() {
+    const el = document.getElementById('speed-display');
+    if (!el) return;
+    const speed = computeCurrentSpeed();
+    el.innerText = `${speed} ft`;
+}
+
 // Short Range Attacks
 function rollShortRangeFirstTurn() {
 const description = 'Short Range - First Turn<br>Faerie Fire (advantage) + Hunters Mark (1d6) + Shortbow + Dread Ambusher + 1d6 Magic + Sharpshooter';
@@ -1021,6 +1042,25 @@ function applyFirstTurnBuffs() {
         }
     } else {
         messages.push("Hunter's Mark already active.");
+    }
+
+    // First Turn Speed bonus: grant a one-time +10 ft movement bonus until next attack
+    const hasFirstTurnSpeed = activeEffects.some(e => e.name && e.name.toLowerCase() === 'first turn speed' && e.state === 'active');
+    if (!hasFirstTurnSpeed) {
+        const ftEffect = {
+            name: 'First Turn Speed',
+            movementBonus: 10,
+            desc: 'First-turn speed bonus: +10 ft movement until your next weapon attack. Consumes on next attack.',
+            oneTime: true,
+            highlightAttack: true,
+            clearOnLongRest: false,
+            state: 'active',
+            appliedRolls: []
+        };
+        addActiveEffect(ftEffect);
+        messages.push('First Turn Speed applied (+10 ft).');
+    } else {
+        messages.push('First Turn Speed already applied.');
     }
 
     // Update UI and show remaining slots
@@ -1919,6 +1959,7 @@ function updateActiveEffectsUI() {
         let header = eff.name || '(Unnamed)';
         if (eff.dc) header += ` (DC ${eff.dc})`;
         if (eff.bonusDice) header += ` (${eff.bonusDice})`;
+        if (typeof eff.movementBonus !== 'undefined') header += ` (+${eff.movementBonus} ft)`;
         const stateLabel = eff.state ? eff.state.charAt(0).toUpperCase() + eff.state.slice(1) : 'Active';
         // Determine if this effect was applied to the last roll
         const appliedLabel = (eff.appliedRolls && lastRollId && eff.appliedRolls.indexOf(lastRollId) !== -1) ? ' — applied' : '';
@@ -1939,6 +1980,8 @@ function updateActiveEffectsUI() {
     updateAttackHighlights();
     // Update spell buttons (active/applied/consumed visuals)
     updateSpellButtons();
+    // Update movement speed display
+    try { updateSpeedDisplay(); } catch (e) { /* ignore */ }
 }
 
 function updateSpellButtons() {
@@ -2165,6 +2208,7 @@ function castZephyrStrike() {
         name: 'Zephyr Strike',
         bonusDice: '1d8',
         desc: 'Prime for enhanced mobility and extra 1d8 force damage on your next weapon attack. Consumes on next attack.',
+        movementBonus: 30, // feet added to movement until next attack
         oneTime: true,
         highlightAttack: true,
         clearOnLongRest: false,

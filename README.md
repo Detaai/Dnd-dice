@@ -39,3 +39,20 @@ Want changes?
 
 License
 - This is a small personal utility; no license is specified.
+
+Death & Revival (added behavior)
+- When the player's HP reaches 0 the UI will fade to black and the app redirects to `saving-throws.html`.
+- `saving-throws.html` is a minimal black-screen mini-game with six circles and a `revive` button:
+   - The first three circles are "life" circles — clicking each turns it green; when all three are green you are returned to `index.html` and granted 1 HP.
+   - The last three circles are "death" circles — clicking them turns them red but they do not restore HP.
+   - The `revive` button immediately returns you to `index.html` and grants 1 HP.
+
+Testing
+- Open `index.html` in a browser and reduce health to 0 (use the UI's damage buttons or run a scripted changeHealth call). The screen should fade and redirect to `saving-throws.html`.
+- Use the life circles or the revive button to return; after returning your HP will be set to 1.
+
+Files to inspect
+- `index.html` — main UI (health displays, dice, weapons)
+- `dice.js` — game logic; look for `changeHealth`, `initHealth`, and the `revivedFromDeath` flag handling.
+
+If you'd like the revive mechanic changed (different HP amount, animations, sounds, or different mini-game), tell me what you want and I will implement it.
