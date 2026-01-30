@@ -535,29 +535,42 @@ if (Array.isArray(equippedWeapons) && equippedWeapons.indexOf('dupo-quiver') !==
         console.error('Dupo B apply error', e);
     }
 
-    // If Echo Band is equipped, compute echoes per shot and consume one use per attack used
+    // If Echo Band is equipped, compute echoes for both shots first
+    // then decrement the ring's uses by the number of echoes actually applied.
     if (ringUsedId) {
         const ring = magicRings[ringUsedId];
         try {
-            // Shot A
-            if (ring.currentUses && ring.currentUses > 0) {
+            let echoesApplied = 0;
+
+            // Determine availability up-front to avoid sequential mutation issues
+            const availBefore = ring.currentUses || 0;
+
+            // Apply to Shot A if at least 1 use available
+            if (availBefore >= 1) {
                 const echoA = Math.max(1, Math.floor(totalA * (ring.damageModifier || 0.5)));
                 totalA += echoA;
                 hunterAHtml += `<div style="color:#fff; margin:6px 0;">${ring.name} Echo: +${echoA} (half of shot)</div>`;
-                ring.currentUses = Math.max(0, ring.currentUses - 1);
+                echoesApplied++;
             } else {
                 hunterAHtml += `<div style="color:#777; margin:6px 0;">${ring.name} Echo: (no uses remaining)</div>`;
             }
-            // Shot B
-            if (ring.currentUses && ring.currentUses > 0) {
+
+            // Apply to Shot B if at least 2 uses were available before (i.e., one remaining after A)
+            if (availBefore >= 2) {
                 const echoB = Math.max(1, Math.floor(totalB * (ring.damageModifier || 0.5)));
                 totalB += echoB;
                 hunterBHtml += `<div style="color:#fff; margin:6px 0;">${ring.name} Echo: +${echoB} (half of shot)</div>`;
-                ring.currentUses = Math.max(0, ring.currentUses - 1);
+                echoesApplied++;
             } else {
-                hunterBHtml += `<div style="color:#777; margin:6px 0;">${ring.name} Echo: (no uses remaining)</div>`;
+                // If B didn't get an echo, show 'no uses' only if there were no uses at all
+                if (availBefore < 2) hunterBHtml += `<div style="color:#777; margin:6px 0;">${ring.name} Echo: (no uses remaining)</div>`;
             }
-            updateRingStatus();
+
+            if (echoesApplied > 0) {
+                // When using Dupo Quiver, consume only one ring use for the full two-shot action
+                ring.currentUses = Math.max(0, (ring.currentUses || 0) - 1);
+                updateRingStatus();
+            }
         } catch (e) {
             console.error('Error applying echo band to Dupo shots', e);
         }
