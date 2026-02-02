@@ -125,6 +125,23 @@
         }
 
         .particle-anim { animation-name: particleMove; animation-timing-function: cubic-bezier(.15,.9,.25,1); animation-fill-mode: forwards; }
+
+        /* Floating close-inventory button image on far left */
+        .floating-inventory {
+            position: fixed;
+            left: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 76px;
+            height: auto;
+            z-index: 99998;
+            pointer-events: auto;
+            cursor: pointer;
+            transition: transform .18s ease, opacity .18s ease;
+            opacity: 0.92;
+            filter: drop-shadow(0 8px 18px rgba(0,0,0,0.35));
+        }
+        .floating-inventory:hover { transform: translateY(-50%) scale(1.06); opacity: 1; }
     </style>
     <style>
         /* Subtle textured overlay to add depth and tie accent colors together */
@@ -674,7 +691,7 @@
     
     <script src="dice.js"></script>
     
-    <!-- Bottom bumber / footer -->
+  <!-- Bottom bumber / footer -->
     <div id="bumber" class="bumber">
         <div class="text"><strong>D&amp;D Dice Roller</strong> — Local • <span class="muted">v69.63</span></div>
         <div style="display:flex;gap:8px;align-items:center;">
@@ -682,6 +699,8 @@
             <button class="close-btn" onclick="toggleBumber()">Hide</button>
         </div>
     </div>
+    <!-- Floating close-inventory image (far left) -->
+    <img src="close-inventory.png" alt="Close Inventory" class="floating-inventory" id="floating-inventory" />
 </body>
     <div id="health-overlay">
         <div class="theme-purple"></div>
@@ -690,3 +709,4 @@
         <div class="pulse"></div>
     </div>
 </html>
+
