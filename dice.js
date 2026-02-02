@@ -25,6 +25,71 @@ failDiv.style.animation = '';
 }, 2500);
 }
 
+// Visual life effect: dynamically place an image near the health header and animate it
+function triggerLifeEffect(type) {
+    try {
+        // prefer the lower health display so particles originate lower on page
+        const anchor = document.getElementById('health-display') || document.getElementById('health-header') || document.getElementById('health');
+        const rect = anchor ? anchor.getBoundingClientRect() : { left: window.innerWidth / 2, top: window.innerHeight / 2, width: 0, height: 0 };
+        const centerX = (rect.left || (window.innerWidth / 2)) + ((rect.width || 0) / 2);
+        // start slightly below the anchor (use rect.bottom) so particles are lower on the screen
+        const startY = (rect.top || 0) + (rect.height || 0) + 12;
+
+        // spawn multiple particle copies of the PNG
+        const count = type === 'gain' ? 10 : 12;
+        // horizontal spread and size randomness to avoid clustering
+        const spreadHoriz = type === 'gain' ? 220 : 260;
+        for (let i = 0; i < count; i++) {
+            const p = document.createElement('img');
+            p.className = 'life-particle ' + (type === 'gain' ? 'gain' : 'lose') + ' particle-anim';
+            p.src = type === 'gain' ? 'gain-life.png' : 'lose-life.png';
+
+            // random size (px) — increased range for larger particles
+            const size = Math.round(64 + Math.random() * 120);
+            p.style.width = size + 'px';
+
+            // scale horizontal spread with particle size so larger particles disperse more
+            const avgSize = 96;
+            const spreadScale = size / avgSize; // >1 when larger
+            const effectiveSpread = Math.round(spreadHoriz * spreadScale);
+            // horizontal offset from center (so they spawn across a band)
+            const offsetX = Math.round((Math.random() - 0.5) * effectiveSpread);
+            const left = Math.max(6, Math.min(window.innerWidth - size - 6, Math.round(centerX + offsetX - (size / 2))));
+
+            // slight vertical variation so they don't all start at same Y
+            const topJitter = Math.round((Math.random() - 0.5) * 30);
+            const top = Math.max(6, Math.min(window.innerHeight - size - 6, Math.round(startY + 8 + topJitter)));
+
+            // horizontal-forward biased trajectory for wider spread and less vertical travel
+            const horizRandom = Math.round((Math.random() - 0.5) * effectiveSpread * 0.9);
+            const dx = offsetX + horizRandom + Math.round((Math.random() - 0.5) * 40);
+            // small vertical drift only (positive or negative small amount)
+            const dy = Math.round((Math.random() - 0.6) * 40); // slight upward bias when negative
+            const rot = Math.round((Math.random() * 120) - 60);
+            const scale = (type === 'gain' ? (0.6 + Math.random() * 0.9) : (0.5 + Math.random() * 1.1)).toFixed(2);
+
+            p.style.setProperty('--dx', dx + 'px');
+            p.style.setProperty('--dy', dy + 'px');
+            p.style.setProperty('--rot', rot + 'deg');
+            p.style.setProperty('--scale', scale);
+
+            p.style.left = left + 'px';
+            p.style.top = top + 'px';
+
+            // randomized duration and slight delay
+            const dur = Math.round((type === 'gain' ? (700 + Math.random() * 600) : (700 + Math.random() * 800)));
+            const delay = Math.round(Math.random() * 220);
+            p.style.animationDuration = dur + 'ms';
+            p.style.animationDelay = delay + 'ms';
+
+            document.body.appendChild(p);
+            // cleanup
+            p.addEventListener('animationend', () => { try { p.remove(); } catch (e) {} });
+            setTimeout(() => { if (p.parentNode) p.remove(); }, dur + delay + 300);
+        }
+    } catch (e) { /* ignore errors */ }
+}
+
 // Add flashing animation to page
 const style = document.createElement('style');
 style.textContent = `@keyframes flashFail { 0%{opacity:1;} 50%{opacity:0;} 100%{opacity:1;} }`;
@@ -48,7 +113,7 @@ function attachDiceInputListeners(inputElem) {
     });
     inputElem.addEventListener('keydown', function(e) {
         if (e.key === 'Enter') {
-            const rb = document.getElementById('roll-btn'); if (rb) rb.click();
+            const rb = document.getElementById('roll-btn '); if (rb) rb.click();
         }
     });
 }
@@ -1675,11 +1740,17 @@ function updateHealthUI() {
 
 function changeHealth(delta) {
     loadHealth();
-    currentHealth = Math.max(0, Math.min(maxHealth, currentHealth + delta));
+    const rawDelta = delta || 0;
+    currentHealth = Math.max(0, Math.min(maxHealth, currentHealth + rawDelta));
     saveHealth();
     updateHealthUI();
     const out = document.getElementById('weapon-output') || document.getElementById('magic-output');
     if (out) out.innerHTML = `<div style="color:#fff;">Health: ${currentHealth}/${maxHealth}</div>`;
+    // show a small visual when HP changes
+    try {
+        if (rawDelta > 0) triggerLifeEffect('gain');
+        else if (rawDelta < 0) triggerLifeEffect('lose');
+    } catch (e) { /* ignore visual errors */ }
     // If HP reached 0, fade out and redirect to saving-throws
     try {
         if (currentHealth <= 0 && !_deathTransitioning) {

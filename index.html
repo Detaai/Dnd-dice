@@ -91,6 +91,42 @@
         .bumber .close-btn{background:transparent;border:1px solid rgba(255,255,255,0.06);color:#fff;padding:6px 8px;border-radius:8px;cursor:pointer}
     </style>
     <style>
+        /* Life gain / lose visuals */
+        .life-effect-img { position: fixed; pointer-events: none; width: auto; height: 96px; transform-origin: center; z-index: 99999; opacity: 0; will-change: transform, opacity; }
+
+        @keyframes gainLife {
+            0% { transform: translateY(0) scale(0.72) rotate(0deg); opacity: 0; filter: drop-shadow(0 6px 14px rgba(80,255,150,0.18)); }
+            10% { opacity: 1; }
+            60% { transform: translateY(-120px) scale(1.06) rotate(-6deg); opacity: 1; filter: drop-shadow(0 18px 40px rgba(80,255,150,0.32)); }
+            100% { transform: translateY(-220px) scale(0.92) rotate(-8deg); opacity: 0; }
+        }
+
+        @keyframes loseLife {
+            0% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; filter: drop-shadow(0 6px 12px rgba(255,80,80,0.18)); }
+            30% { transform: translateY(-12px) rotate(6deg) scale(1.02); opacity: 1; }
+            60% { transform: translateY(8px) rotate(-8deg) scale(0.98); opacity: 0.9; filter: blur(0.6px) drop-shadow(0 24px 36px rgba(255,40,40,0.42)); }
+            100% { transform: translateY(40px) scale(0.6) rotate(-12deg); opacity: 0; }
+        }
+
+        .life-effect-gain { animation: gainLife 1000ms cubic-bezier(.2,.9,.3,1); }
+        .life-effect-lose { animation: loseLife 900ms cubic-bezier(.2,.9,.3,1); }
+
+        /* Particle-style PNG copies */
+        .life-particle { position: fixed; pointer-events: none; z-index: 99999; will-change: transform, opacity, filter; mix-blend-mode: screen; opacity: 0; }
+        .life-particle.gain { mix-blend-mode: screen; filter: drop-shadow(0 8px 18px rgba(80,255,150,0.18)); }
+        .life-particle.lose { mix-blend-mode: multiply; filter: grayscale(1) contrast(1.1) drop-shadow(0 8px 18px rgba(0,0,0,0.28)); }
+
+        @keyframes particleMove {
+            0% { opacity: 0; transform: translate(0,0) scale(0.2) rotate(0deg); }
+            10% { opacity: 1; }
+            70% { opacity: 1; }
+            /* Move to the CSS-provided dx/dy; defaults favor horizontal motion */
+            100% { opacity: 0; transform: translate(var(--dx, 0px), var(--dy, 0px)) scale(var(--scale,1)) rotate(var(--rot,0deg)); }
+        }
+
+        .particle-anim { animation-name: particleMove; animation-timing-function: cubic-bezier(.15,.9,.25,1); animation-fill-mode: forwards; }
+    </style>
+    <style>
         /* Subtle textured overlay to add depth and tie accent colors together */
         body::before{
             content: '';
