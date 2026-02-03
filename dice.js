@@ -2423,7 +2423,7 @@ function runSanityChecks() {
     } catch (e) { results.push(`updateDiceSelectors error: ${e.message}`); }
     try {
         updateArmorAC(); updateACUI();
-        results.push(`updateArmorAC/updateACUI -> AC ${typeof currentAC !== 'undefined' ? currentAC : 'unknown'}`);
+        results.push(`updateArmorAC/updateACUI -> AC ${typeof currentAC !== 'undefined' ? currentAC : 'unknown'}`); 
     } catch (e) { results.push(`updateArmorAC error: ${e.message}`); }
 
     console.group('Sanity Checks');
