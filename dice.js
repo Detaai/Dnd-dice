@@ -90,6 +90,273 @@ function triggerLifeEffect(type) {
     } catch (e) { /* ignore errors */ }
 }
 
+// ===== RESISTANCE TRACKING SYSTEM =====
+let activeResistances = []; // Array of resistance types - ALLOWS STACKING (duplicates permitted)
+
+const RESISTANCE_TYPES = {
+    // Physical
+    'bludgeoning': 'Bludgeoning',
+    'piercing': 'Piercing',
+    'slashing': 'Slashing',
+    // Elemental
+    'fire': 'Fire',
+    'cold': 'Cold',
+    'lightning': 'Lightning',
+    'thunder': 'Thunder',
+    'acid': 'Acid',
+    'poison': 'Poison',
+    // Energy/Magical
+    'force': 'Force',
+    'radiant': 'Radiant',
+    'necrotic': 'Necrotic',
+    'psychic': 'Psychic'
+};
+
+function addResistance(type) {
+    const normalizedType = type.toLowerCase();
+    // Allow stacking - always add, even if already present
+    activeResistances.push(normalizedType);
+    updateResistancesUI();
+}
+
+function removeResistance(type) {
+    const normalizedType = type.toLowerCase();
+    // Remove only ONE instance to support stacking
+    const idx = activeResistances.indexOf(normalizedType);
+    if (idx !== -1) {
+        activeResistances.splice(idx, 1);
+    }
+    updateResistancesUI();
+}
+
+function updateResistancesUI() {
+    const display = document.getElementById('resistances-display');
+    const list = document.getElementById('resistances-list');
+    if (!display || !list) return;
+
+    if (activeResistances.length === 0) {
+        display.style.display = 'none';
+        return;
+    }
+
+    display.style.display = 'block';
+    
+    // Count occurrences of each resistance type
+    const counts = {};
+    activeResistances.forEach(r => {
+        counts[r] = (counts[r] || 0) + 1;
+    });
+    
+    // Create badges with stack counts
+    list.innerHTML = Object.keys(counts).sort().map(r => {
+        const label = RESISTANCE_TYPES[r] || r;
+        const count = counts[r];
+        const displayText = count > 1 ? `${label} ×${count}` : label;
+        return `<span style="padding:4px 10px;background:rgba(100,200,255,0.2);border:1px solid rgba(100,200,255,0.4);border-radius:6px;color:#fff;font-size:0.85rem;font-weight:600;">${displayText}</span>`;
+    }).join('');
+}
+
+// ===== EQUIPMENT INVENTORY SYSTEM =====
+const EQUIPMENT_DATA = {
+    'arrows': { name: 'Arrows', desc: 'Alot of arrows' },
+    'basic-clothing': { name: 'Basic Clothing', desc: 'Basic travel clothing' },
+    'cloak-of-heavenly-warmth': { name: 'Cloak of Heavenly Warmth', desc: "User can't freeze from magical sources, user gains resistance to ice magic", grantsResistance: 'cold' },
+    'coin-pouch': { name: 'Coin Pouch', desc: 'Your purse of riches or fleas' },
+    'dagger': { name: 'Dagger', desc: 'Simple dagger, can be attached to Wrist launcher for disguised weapon.' },
+    'dupo-quiver': { name: 'Dupo Quiver', desc: 'Knock on wood two times and your shot is doubled! You are able to hit up to 2 targets!' },
+    'echo-band': { name: 'Echo Band', desc: 'Create an echo of any object that fully passes through, this echo follows the exact path of the original and cannot be separated, the echo only lasts for one minute and does half damage' },
+    'giggle-shot': { name: 'Giggle Shot', desc: "A short bow infused with the world's worst dad jokes, creature hit with this must make a 12 DC Wisdom saving throw or lose their action and fall to the floor laughing" },
+    'longbow': { name: 'Long bow', desc: 'A reliable longbow for ranged attacks' },
+    'quiver': { name: 'Quiver', desc: 'A normal Quiver, to hold arrows' },
+    'short-sword': { name: 'Short sword', desc: 'Simple short sword' },
+    'smiths-tools': { name: "Smiths tools", desc: 'Tools for blacksmithing and metalwork' },
+    'studded-leather-armor': { name: 'Studded leather armor', desc: 'Armor, 12ac +Dexterity modifier' },
+    'tinkers-tools': { name: "Tinkers tools", desc: 'Tools for tinkering and crafting' },
+    'wrist-launcher': { name: 'Wrist launcher', desc: 'A simple wrist launcher with 5 smoke pellets and 12 poison darts' }
+};
+
+const DEFAULT_EQUIPPED = ['wrist-launcher', 'dagger', 'dupo-quiver', 'echo-band', 'longbow', 'giggle-shot', 'basic-clothing', 'arrows'];
+
+let equippedItems = [];
+let currentEquipmentTab = 'equipped';
+
+function loadEquipment() {
+    try {
+        const stored = localStorage.getItem('equippedItems');
+        if (stored) {
+            equippedItems = JSON.parse(stored);
+        } else {
+            equippedItems = [...DEFAULT_EQUIPPED];
+            saveEquipment();
+        }
+    } catch (e) {
+        equippedItems = [...DEFAULT_EQUIPPED];
+    }
+    
+    // Initialize resistances from currently equipped items
+    activeResistances = [];
+    equippedItems.forEach(itemId => {
+        const item = EQUIPMENT_DATA[itemId];
+        if (item && item.grantsResistance) {
+            addResistance(item.grantsResistance);
+        }
+    });
+}
+
+function saveEquipment() {
+    try {
+        localStorage.setItem('equippedItems', JSON.stringify(equippedItems));
+    } catch (e) { /* ignore */ }
+}
+
+function toggleEquipItem(itemId) {
+    const idx = equippedItems.indexOf(itemId);
+    const item = EQUIPMENT_DATA[itemId];
+    
+    if (idx >= 0) {
+        // Unequipping
+        equippedItems.splice(idx, 1);
+        // Remove resistance if this item grants one
+        if (item && item.grantsResistance) {
+            removeResistance(item.grantsResistance);
+        }
+    } else {
+        // Equipping
+        equippedItems.push(itemId);
+        // Add resistance if this item grants one
+        if (item && item.grantsResistance) {
+            addResistance(item.grantsResistance);
+        }
+    }
+    saveEquipment();
+    renderEquipmentList();
+}
+
+function renderEquipmentList() {
+    const container = document.getElementById('equipment-list');
+    if (!container) return;
+
+    const allIds = Object.keys(EQUIPMENT_DATA).sort((a, b) => EQUIPMENT_DATA[a].name.localeCompare(EQUIPMENT_DATA[b].name));
+    let filteredIds = allIds;
+
+    if (currentEquipmentTab === 'equipped') {
+        filteredIds = allIds.filter(id => equippedItems.includes(id));
+    } else if (currentEquipmentTab === 'unequipped') {
+        filteredIds = allIds.filter(id => !equippedItems.includes(id));
+    }
+
+    let html = '';
+    filteredIds.forEach(id => {
+        const item = EQUIPMENT_DATA[id];
+        const isEquipped = equippedItems.includes(id);
+        const statusClass = isEquipped ? 'equipped' : 'unequipped';
+        const btnText = isEquipped ? 'Unequip' : 'Equip';
+        html += `
+            <div class="equipment-item ${statusClass}">
+                <div class="equipment-name">${item.name}</div>
+                <div class="equipment-desc">${item.desc}</div>
+                <button class="equipment-toggle-btn" onclick="toggleEquipItem('${id}')">${btnText}</button>
+            </div>
+        `;
+    });
+
+    if (filteredIds.length === 0) {
+        html = '<div style="color:var(--muted);text-align:center;padding:20px;">No items in this category.</div>';
+    }
+
+    container.innerHTML = html;
+}
+
+function switchEquipmentTab(tab) {
+    currentEquipmentTab = tab;
+    document.querySelectorAll('.equipment-tab').forEach(el => {
+        el.classList.toggle('active', el.dataset.tab === tab);
+    });
+    renderEquipmentList();
+}
+
+function openEquipmentModal() {
+    const modal = document.getElementById('equipment-modal');
+    if (!modal) return;
+    loadEquipment();
+    renderEquipmentList();
+    modal.classList.add('open');
+    modal.style.display = 'flex';
+}
+
+function closeEquipmentModal() {
+    const modal = document.getElementById('equipment-modal');
+    if (!modal) return;
+    modal.classList.remove('open');
+    modal.style.display = 'none';
+    // Reset floating button state
+    const el = document.getElementById('floating-inventory');
+    if (el) {
+        el.dataset.state = 'closed';
+        el.src = 'close-inventory.png';
+    }
+}
+
+// Floating inventory toggle: close-inventory opens modal, open-inventory closes it
+function initFloatingInventoryToggle() {
+    try {
+        const el = document.getElementById('floating-inventory');
+        if (!el) return;
+        el.dataset.state = el.dataset.state || 'closed';
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            try {
+                const isClosed = el.dataset.state === 'closed';
+                if (isClosed) {
+                    // Open equipment modal
+                    el.dataset.state = 'open';
+                    el.src = 'open-inventory.png';
+                    openEquipmentModal();
+                } else {
+                    // Close equipment modal
+                    el.dataset.state = 'closed';
+                    el.src = 'close-inventory.png';
+                    closeEquipmentModal();
+                }
+                // small pulse to indicate toggle
+                el.style.transition = 'transform .12s ease';
+                el.style.transform = 'translateY(-50%) scale(1.08)';
+                setTimeout(() => { el.style.transform = 'translateY(-50%) scale(1)'; }, 140);
+            } catch (e) { /* ignore */ }
+        });
+    } catch (e) { /* ignore */ }
+}
+
+function initEquipmentModal() {
+    // Add click handler to close modal when clicking backdrop
+    const modal = document.getElementById('equipment-modal');
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeEquipmentModal();
+            }
+        });
+    }
+}
+
+// Expose functions globally for onclick handlers
+window.closeEquipmentModal = closeEquipmentModal;
+window.switchEquipmentTab = switchEquipmentTab;
+window.toggleEquipItem = toggleEquipItem;
+
+// initialize UI toggles after script loads
+try { 
+    window.addEventListener('DOMContentLoaded', () => {
+        initFloatingInventoryToggle();
+        initEquipmentModal();
+    }); 
+} catch (e) { 
+    setTimeout(() => {
+        initFloatingInventoryToggle();
+        initEquipmentModal();
+    }, 500); 
+}
+
 // Add flashing animation to page
 const style = document.createElement('style');
 style.textContent = `@keyframes flashFail { 0%{opacity:1;} 50%{opacity:0;} 100%{opacity:1;} }`;
@@ -2173,25 +2440,50 @@ function toggleAbsorbElements() {
     if (idx !== -1) {
         // deactivate
         const removed = activeEffects.splice(idx, 1)[0];
+        // Remove the resistance granted by this spell
+        if (removed.resistanceType) {
+            removeResistance(removed.resistanceType);
+        }
         updateActiveEffectsUI();
         updateAbsorbButton(false);
         if (out) out.innerHTML = `<div style="color:#ff6;font-weight:700;">Deactivated: ${removed.name}</div>`;
         return;
     }
 
-    // Activate Absorb Elements (defensive, no damage effect)
+    // Prompt user to choose element type
+    const elementChoice = prompt('Choose element type for Absorb Elements:\n\nFire, Cold, Lightning, Thunder, or Acid', 'Fire');
+    if (!elementChoice) return; // Cancelled
+    
+    const normalizedElement = elementChoice.toLowerCase().trim();
+    const validElements = ['fire', 'cold', 'lightning', 'thunder', 'acid'];
+    
+    if (!validElements.includes(normalizedElement)) {
+        alert('Invalid element type. Choose: Fire, Cold, Lightning, Thunder, or Acid');
+        return;
+    }
+
+    // Activate Absorb Elements (defensive + next attack bonus damage)
+    const elementName = normalizedElement.charAt(0).toUpperCase() + normalizedElement.slice(1);
     const effect = {
-        name: 'Absorb Elements',
-        desc: 'Reactive protection: you gain resistance to the triggering elemental damage type until the start of your next turn. (Reminder only; does not modify weapon damage in this tracker).',
+        name: `Absorb Elements (${elementName})`,
+        bonusDice: '1d8',
+        desc: `Reactive protection: you gain resistance to ${elementName} damage until the start of your next turn, and your next weapon attack deals +1d8 ${elementName} damage.`,
         defensive: true,
-        clearOnLongRest: false
+        oneTime: true,
+        highlightAttack: true,
+        clearOnLongRest: false,
+        resistanceType: normalizedElement
     };
     effect.state = 'active';
     effect.appliedRolls = [];
+    
+    // Add the resistance
+    addResistance(normalizedElement);
+    
     addActiveEffect(effect);
     updateAbsorbButton(true);
-    recordRoll({ total: 0, title: 'Absorb Elements (active)', breakdownHtml: `<div style="color:#fff">Absorb Elements activated — defensive effect (no damage rolls).</div>`, isCritSuccess: false, isCritFail: false });
-    if (out) out.innerHTML = `<div style="font-weight:700;color:#ffd">Absorb Elements activated</div><div style="color:#e8e8e8;margin-top:6px;">This is a defensive reaction reminder and does not affect weapon damage in this panel. Toggle to deactivate.</div>`;
+    recordRoll({ total: 0, title: `Absorb Elements (${elementName})`, breakdownHtml: `<div style="color:#fff">Absorb Elements activated — ${elementName} resistance granted and +1d8 ${elementName} damage on next attack.</div>`, isCritSuccess: false, isCritFail: false });
+    if (out) out.innerHTML = `<div style="font-weight:700;color:#ffd">Absorb Elements (${elementName}) activated</div><div style="color:#e8e8e8;margin-top:6px;">You have resistance to ${elementName} damage until the start of your next turn, and your next weapon attack deals +1d8 ${elementName} damage. Toggle to deactivate.</div>`;
 }
 
 function castFaerieFire() {
@@ -2423,7 +2715,7 @@ function runSanityChecks() {
     } catch (e) { results.push(`updateDiceSelectors error: ${e.message}`); }
     try {
         updateArmorAC(); updateACUI();
-        results.push(`updateArmorAC/updateACUI -> AC ${typeof currentAC !== 'undefined' ? currentAC : 'unknown'}`); 
+        results.push(`updateArmorAC/updateACUI -> AC ${typeof currentAC !== 'undefined' ? currentAC : 'unknown'}`);
     } catch (e) { results.push(`updateArmorAC error: ${e.message}`); }
 
     console.group('Sanity Checks');
