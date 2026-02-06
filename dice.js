@@ -222,9 +222,8 @@ function syncLingeringWoundsUI() {
 
 function updateLingeringWoundsSummary() {
     const summary = document.getElementById('lingering-wounds-active');
-    if (!summary) return;
     if (!activeLingeringWounds || activeLingeringWounds.length === 0) {
-        summary.textContent = 'Active: None';
+        if (summary) summary.textContent = 'Active: None';
         updateOngoingDamageDisplay();
         return;
     }
@@ -232,7 +231,7 @@ function updateLingeringWoundsSummary() {
         const w = LINGERING_WOUNDS[id];
         return w ? `${w.name} (${w.damage})` : id;
     });
-    summary.textContent = `Active: ${lines.join(' • ')}`;
+    if (summary) summary.textContent = `Active: ${lines.join(' • ')}`;
     updateOngoingDamageDisplay();
 }
 
@@ -315,6 +314,13 @@ function loadEquipment() {
             addResistance(item.grantsResistance);
         }
     });
+
+    // Ensure UI updates after DOM is ready (GitHub Pages can race this)
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => updateResistancesUI(), { once: true });
+    } else {
+        updateResistancesUI();
+    }
 }
 
 function saveEquipment() {
