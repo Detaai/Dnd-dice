@@ -377,6 +377,23 @@
         .prof-badge{width:56px;height:56px;border-radius:10px;background:linear-gradient(90deg,#3b2b6a,#6f4ef0);display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;font-size:1.1rem;box-shadow:0 8px 20px rgba(50,30,120,0.18)}
         .skills-list{margin-top:8px;color:#e8e8e8;display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0;margin:8px 0 0 0}
         .skills-list li{margin:0;background:rgba(255,255,255,0.02);padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.03)}
+        /* Status pills + dropdowns */
+        .status-card{padding:12px;border-radius:12px;background:linear-gradient(160deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.06);box-shadow:inset 0 0 0 1px rgba(255,255,255,0.02)}
+        .status-title{font-weight:800;font-size:0.9rem;color:rgba(255,255,255,0.7);margin-bottom:8px;text-align:center;letter-spacing:0.02em}
+        .pill-list{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+        .pill{padding:4px 10px;border-radius:999px;color:#fff;font-size:0.82rem;font-weight:700;letter-spacing:0.01em;box-shadow:0 6px 16px rgba(0,0,0,0.2)}
+        .pill-blue{background:linear-gradient(135deg,rgba(100,200,255,0.25),rgba(100,150,255,0.12));border:1px solid rgba(100,200,255,0.45)}
+        .pill-red{background:linear-gradient(135deg,rgba(255,120,120,0.25),rgba(255,80,80,0.12));border:1px solid rgba(255,120,120,0.45)}
+        .status-empty{color:#8a8a8a;font-size:0.85rem;text-align:center}
+        .status-details{margin-top:10px;padding:10px 12px;border-radius:12px;background:linear-gradient(135deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.06)}
+        .status-details summary{list-style:none;cursor:pointer;font-weight:800;font-size:0.85rem;color:rgba(255,255,255,0.7);display:flex;align-items:center;justify-content:space-between}
+        .status-details summary::after{content:'▾';font-size:0.9rem;color:rgba(255,255,255,0.6);transition:transform .15s ease}
+        .status-details[open] summary::after{transform:rotate(180deg)}
+        .wound-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+        .wound-item{display:flex;align-items:center;gap:8px;padding:8px;border-radius:10px;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.06);cursor:pointer;transition:transform .12s ease, border-color .12s ease}
+        .wound-item:hover{transform:translateY(-1px);border-color:rgba(255,255,255,0.12)}
+        .wound-name{font-weight:700;color:#fff}
+        .wound-dmg{font-size:0.78rem;color:#b9b9b9}
     </style>
 </head>
 <body>
@@ -390,9 +407,14 @@
                     <div style="background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);">HP: <span id="health-header" style="font-weight:800;color:#fff;">45 / 45</span></div>
                 </div>
                 <!-- Resistances Display (hidden when empty) -->
-                <div id="resistances-display" style="display:none;margin-top:10px;padding:10px 12px;border-radius:10px;background:linear-gradient(135deg,rgba(100,200,255,0.1),rgba(100,150,255,0.05));border:1px solid rgba(100,200,255,0.2);">
-                    <div style="font-size:0.85rem;color:rgba(255,255,255,0.6);margin-bottom:4px;font-weight:600;">Resistances</div>
-                    <div id="resistances-list" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+                <div id="resistances-display" class="status-details" style="display:none;">
+                    <div class="status-title">Resistances</div>
+                    <div id="resistances-list" class="pill-list"></div>
+                </div>
+                <!-- Ongoing Damage Display (hidden when empty) -->
+                <div id="ongoing-damage-display" class="status-details" style="display:none;">
+                    <div class="status-title">Ongoing Damage (per turn)</div>
+                    <div id="ongoing-damage-list" class="pill-list" style="margin-top:8px;"></div>
                 </div>
                 <div style="margin-top:8px;display:flex;gap:10px;align-items:center;">
                     <div class="char-field" style="position:relative;">
@@ -517,6 +539,81 @@
                         <div style="font-weight:800;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">Initiative</div>
                         <button class="weapon-btn" onclick="rollInitiative()" style="margin-bottom:8px;width:100%;">Roll (1d20 + 6)</button>
                         <button class="weapon-btn secondary-action" onclick="showPdf('Thaine-lv-5.pdf','Thaine-lv-5.pdf')" style="width:100%;font-size:0.85rem;">Character Sheet</button>
+                    </div>
+                </div>
+                <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div class="status-card">
+                        <div class="status-title">Resistances</div>
+                        <div id="resistances-display-status" style="display:none;">
+                            <div id="resistances-list-status" class="pill-list"></div>
+                        </div>
+                        <div id="resistances-empty-status" class="status-empty">None</div>
+                    </div>
+                    <div class="status-card">
+                        <details id="lingering-wounds-dropdown" class="status-details">
+                            <summary>Lingering Wounds (Ongoing Damage)</summary>
+                            <div>
+                                <div id="lingering-wounds-list" class="wound-grid">
+                                    <label class="wound-item">
+                                        <input type="checkbox" data-wound="bleeding" onchange="toggleLingeringWound(this)" />
+                                        <div>
+                                            <div class="wound-name">Bleeding</div>
+                                            <div class="wound-dmg">Slashing / Piercing</div>
+                                        </div>
+                                    </label>
+                                    <label class="wound-item">
+                                        <input type="checkbox" data-wound="burning" onchange="toggleLingeringWound(this)" />
+                                        <div>
+                                            <div class="wound-name">Burning</div>
+                                            <div class="wound-dmg">Fire</div>
+                                        </div>
+                                    </label>
+                                    <label class="wound-item">
+                                        <input type="checkbox" data-wound="poisoned" onchange="toggleLingeringWound(this)" />
+                                        <div>
+                                            <div class="wound-name">Poisoned</div>
+                                            <div class="wound-dmg">Poison</div>
+                                        </div>
+                                    </label>
+                                    <label class="wound-item">
+                                        <input type="checkbox" data-wound="corrosion" onchange="toggleLingeringWound(this)" />
+                                        <div>
+                                            <div class="wound-name">Corrosion</div>
+                                            <div class="wound-dmg">Acid</div>
+                                        </div>
+                                    </label>
+                                    <label class="wound-item">
+                                        <input type="checkbox" data-wound="freezing" onchange="toggleLingeringWound(this)" />
+                                        <div>
+                                            <div class="wound-name">Freezing</div>
+                                            <div class="wound-dmg">Cold</div>
+                                        </div>
+                                    </label>
+                                    <label class="wound-item">
+                                        <input type="checkbox" data-wound="shocked" onchange="toggleLingeringWound(this)" />
+                                        <div>
+                                            <div class="wound-name">Shocked</div>
+                                            <div class="wound-dmg">Lightning</div>
+                                        </div>
+                                    </label>
+                                    <label class="wound-item">
+                                        <input type="checkbox" data-wound="soul-drain" onchange="toggleLingeringWound(this)" />
+                                        <div>
+                                            <div class="wound-name">Soul Drain</div>
+                                            <div class="wound-dmg">Necrotic</div>
+                                        </div>
+                                    </label>
+                                    <label class="wound-item">
+                                        <input type="checkbox" data-wound="mind-burn" onchange="toggleLingeringWound(this)" />
+                                        <div>
+                                            <div class="wound-name">Mind Burn</div>
+                                            <div class="wound-dmg">Psychic</div>
+                                        </div>
+                                    </label>
+                                </div>
+                                <div id="lingering-wounds-active" class="status-empty" style="margin-top:10px;">Active: None</div>
+                            </div>
+                        </details>
                     </div>
                 </div>
             </div>

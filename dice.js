@@ -132,10 +132,16 @@ function removeResistance(type) {
 function updateResistancesUI() {
     const display = document.getElementById('resistances-display');
     const list = document.getElementById('resistances-list');
+    const displayStatus = document.getElementById('resistances-display-status');
+    const listStatus = document.getElementById('resistances-list-status');
+    const emptyStatus = document.getElementById('resistances-empty-status');
     if (!display || !list) return;
 
     if (activeResistances.length === 0) {
         display.style.display = 'none';
+        if (displayStatus) displayStatus.style.display = 'none';
+        if (listStatus) listStatus.innerHTML = '';
+        if (emptyStatus) emptyStatus.style.display = 'block';
         return;
     }
 
@@ -148,11 +154,119 @@ function updateResistancesUI() {
     });
     
     // Create badges with stack counts
-    list.innerHTML = Object.keys(counts).sort().map(r => {
+    const badgeHtml = Object.keys(counts).sort().map(r => {
         const label = RESISTANCE_TYPES[r] || r;
         const count = counts[r];
         const displayText = count > 1 ? `${label} ×${count}` : label;
-        return `<span style="padding:4px 10px;background:rgba(100,200,255,0.2);border:1px solid rgba(100,200,255,0.4);border-radius:6px;color:#fff;font-size:0.85rem;font-weight:600;">${displayText}</span>`;
+        return `<span class="pill pill-blue">${displayText}</span>`;
+    }).join('');
+    list.innerHTML = badgeHtml;
+    if (displayStatus) displayStatus.style.display = 'block';
+    if (listStatus) listStatus.innerHTML = badgeHtml;
+    if (emptyStatus) emptyStatus.style.display = 'none';
+}
+
+// ===== LINGERING WOUNDS TRACKING =====
+const LINGERING_WOUNDS = {
+    'bleeding': { name: 'Bleeding', damage: 'Slashing / Piercing' },
+    'burning': { name: 'Burning', damage: 'Fire' },
+    'poisoned': { name: 'Poisoned', damage: 'Poison' },
+    'corrosion': { name: 'Corrosion', damage: 'Acid' },
+    'freezing': { name: 'Freezing', damage: 'Cold' },
+    'shocked': { name: 'Shocked', damage: 'Lightning' },
+    'soul-drain': { name: 'Soul Drain', damage: 'Necrotic' },
+    'mind-burn': { name: 'Mind Burn', damage: 'Psychic' }
+};
+
+let activeLingeringWounds = [];
+
+function saveLingeringWounds() {
+    try {
+        localStorage.setItem('lingeringWounds', JSON.stringify(activeLingeringWounds));
+    } catch (e) { /* ignore */ }
+}
+
+function loadLingeringWounds() {
+    try {
+        const stored = localStorage.getItem('lingeringWounds');
+        if (stored) {
+            activeLingeringWounds = JSON.parse(stored) || [];
+        }
+    } catch (e) { /* ignore */ }
+    syncLingeringWoundsUI();
+    updateLingeringWoundsSummary();
+}
+
+function toggleLingeringWound(input) {
+    if (!input || !input.dataset) return;
+    const id = input.dataset.wound;
+    if (!id || !LINGERING_WOUNDS[id]) return;
+
+    if (input.checked) {
+        if (!activeLingeringWounds.includes(id)) activeLingeringWounds.push(id);
+    } else {
+        activeLingeringWounds = activeLingeringWounds.filter(w => w !== id);
+    }
+    saveLingeringWounds();
+    updateLingeringWoundsSummary();
+}
+
+function syncLingeringWoundsUI() {
+    const inputs = document.querySelectorAll('#lingering-wounds-list input[data-wound]');
+    if (!inputs || inputs.length === 0) return;
+    inputs.forEach(inp => {
+        const id = inp.dataset.wound;
+        inp.checked = activeLingeringWounds.includes(id);
+    });
+}
+
+function updateLingeringWoundsSummary() {
+    const summary = document.getElementById('lingering-wounds-active');
+    if (!summary) return;
+    if (!activeLingeringWounds || activeLingeringWounds.length === 0) {
+        summary.textContent = 'Active: None';
+        updateOngoingDamageDisplay();
+        return;
+    }
+    const lines = activeLingeringWounds.map(id => {
+        const w = LINGERING_WOUNDS[id];
+        return w ? `${w.name} (${w.damage})` : id;
+    });
+    summary.textContent = `Active: ${lines.join(' • ')}`;
+    updateOngoingDamageDisplay();
+}
+
+function updateOngoingDamageDisplay() {
+    const display = document.getElementById('ongoing-damage-display');
+    const list = document.getElementById('ongoing-damage-list');
+    if (!display || !list) return;
+
+    if (!activeLingeringWounds || activeLingeringWounds.length === 0) {
+        display.style.display = 'none';
+        list.innerHTML = '';
+        return;
+    }
+
+    const typeSet = new Set();
+    activeLingeringWounds.forEach(id => {
+        const w = LINGERING_WOUNDS[id];
+        if (!w || !w.damage) return;
+        w.damage.split('/').forEach(part => {
+            const t = part.trim();
+            if (t) typeSet.add(t);
+        });
+    });
+
+    const types = Array.from(typeSet);
+    if (types.length === 0) {
+        display.style.display = 'none';
+        list.innerHTML = '';
+        return;
+    }
+
+    display.style.display = 'block';
+    list.innerHTML = types.map(t => {
+        return `<span class="pill pill-red">${t}</span>`;
     }).join('');
 }
 
@@ -343,17 +457,22 @@ function initEquipmentModal() {
 window.closeEquipmentModal = closeEquipmentModal;
 window.switchEquipmentTab = switchEquipmentTab;
 window.toggleEquipItem = toggleEquipItem;
+window.toggleLingeringWound = toggleLingeringWound;
 
 // initialize UI toggles after script loads
 try { 
     window.addEventListener('DOMContentLoaded', () => {
         initFloatingInventoryToggle();
         initEquipmentModal();
+        loadEquipment();
+        loadLingeringWounds();
     }); 
 } catch (e) { 
     setTimeout(() => {
         initFloatingInventoryToggle();
         initEquipmentModal();
+        loadEquipment();
+        loadLingeringWounds();
     }, 500); 
 }
 
