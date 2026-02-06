@@ -92,16 +92,16 @@
         .bumber .muted{color:var(--muted);font-size:0.85rem}
         .bumber .close-btn{background:transparent;border:1px solid rgba(255,255,255,0.06);color:#fff;padding:6px 8px;border-radius:8px;cursor:pointer}
         .floating-inventory {
-            position: fixed;
+            position: absolute;
             left: 0;
-            top: 50%;
-            transform: translateY(-50%);
+            top: 100%;
+            transform: translateY(10px);
             cursor: pointer;
             transition: transform 0.2s ease, opacity 0.2s ease;
             opacity: 0.8;
         }
         .floating-inventory:hover {
-            transform: translateY(-50%) scale(1.06);
+            transform: translateY(10px) scale(1.06);
             opacity: 1;
         }
     </style>
@@ -213,10 +213,10 @@
 
         /* Floating close-inventory button image on far left */
         .floating-inventory {
-            position: fixed;
-            left: 8px;
-            top: 50%;
-            transform: translateY(-50%);
+            position: absolute;
+            left: 0;
+            top: 100%;
+            transform: translateY(10px);
             width: 200px;
             height: auto;
             z-index: 99998;
@@ -226,7 +226,7 @@
             opacity: 0.92;
             filter: drop-shadow(0 8px 18px rgba(0,0,0,0.35));
         }
-        .floating-inventory:hover { transform: translateY(-50%) scale(1.06); opacity: 1; }
+        .floating-inventory:hover { transform: translateY(10px) scale(1.06); opacity: 1; }
     </style>
     <style>
         /* Subtle textured overlay to add depth and tie accent colors together */
@@ -842,7 +842,6 @@
             </div>
 
         </div>
-    </div>
 
         <!-- Magic Weapon Selection Modal -->
 
